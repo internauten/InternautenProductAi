@@ -27,6 +27,23 @@ Dieses PrestaShop-Modul ergänzt im Produkt-Admin einen Button, mit dem anhand d
 - Der Prompt kann im Modul angepasst werden.
 - Bestehender Beschreibungstext bleibt erhalten; die neue Beschreibung wird angehängt.
 
+## Release Tagging
+
+GitHub Releases are created automatically when you push a tag in this format:
+
+- vX.X.X (example: v1.1.2)
+
+Create and push a release tag:
+
+```bash
+git tag v1.1.2
+git push origin v1.1.2
+```
+
+The workflow then builds and uploads:
+
+- internautenproductai-module-v1.1.2.zip
+
 ## Develope
 
 Dammit die Container bei jedem neuen Modul nicht jedesmal neu erstellt werden müssen, versuchen wir es mit symlinks.
