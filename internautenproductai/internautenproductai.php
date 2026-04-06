@@ -14,8 +14,8 @@ class InternautenProductAi extends Module
     {
         $this->name = 'internautenproductai';
         $this->tab = 'administration';
-        $this->version = '0.1.4';
-        $this->author = 'GitHub Copilot';
+        $this->version = '1.0.0';
+        $this->author = 'die.internauten.ch GmbH';
         $this->need_instance = 0;
         $this->bootstrap = true;
 
