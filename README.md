@@ -55,18 +55,24 @@ Dammit die Container bei jedem neuen Modul nicht jedesmal neu erstellt werden m√
 
 Voraussetzungen: im compose hat es unter volumes einen Eintrag - /home/dmo/internauten:/internauten
 
-Bash ins WSL2 und holen des Repos:
-
-```bash
-cd ~/internauten
-git clone https://github.com/internauten/InternautenProductAi.git
-```
-
-Bash in den Container und dann
-
-```bash
-ln -s /internauten/InternautenProductAi/internautenproductai /var/www/html/modules/internautenproductai
-```
+1. Bash ins WSL2 und holen des Repos aus dem fork
+   ```bash
+   cd ~/internauten
+   git clone https://github.com/yourgithub/InternautenProductAi.git
+   ```
+2. set owner, goup and rights
+   ```bash
+   sudo chown -R www-data:www-data ~/InternautenProductAi/internautenproductai
+   sudo chmod -R go+w ~/InternautenProductAi/internautenproductai
+   ```
+3. Bash in den Container und create symlink and set group:owner
+   ```bash
+   sudo ln -s ~/internauten/InternautenProductAi/internautenproductai /var/www/html/modules/internautenproductai
+   sudo chown -h www-data:www-data ~/InternautenProductAi/internautenproductai
+   sudo chown -h www-data:www-data /var/www/html/modules/internautenproductai
+   ```
+4. Activate and configure Module in Prestashop  
+   In Prestashop backend go to Module Manager / not installed Modules and install the module.
 
 ## License
 

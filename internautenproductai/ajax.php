@@ -52,6 +52,21 @@ require_once $prestashopRoot . '/config/config.inc.php';
 require_once $prestashopRoot . '/init.php';
 require_once dirname(__FILE__) . '/internautenproductai.php';
 
+function internautenTranslate($string)
+{
+    static $module = null;
+
+    if ($module === null) {
+        $module = Module::getInstanceByName('internautenproductai');
+    }
+
+    if ($module && method_exists($module, 'l')) {
+        return $module->l($string, 'ajax');
+    }
+
+    return $string;
+}
+
 set_error_handler(function ($severity, $message, $file, $line) {
     if (!(error_reporting() & $severity)) {
         return false;
@@ -65,21 +80,21 @@ try {
     $token = (string) Tools::getValue('token');
 
     if ($token === '' || !hash_equals($expectedToken, $token)) {
-        throw new Exception('Ungültiges Sicherheitstoken. Bitte die Admin-Seite neu laden.');
+        throw new Exception(internautenTranslate('Ungültiges Sicherheitstoken. Bitte die Admin-Seite neu laden.'));
     }
 
     if ((string) Tools::getValue('action') !== 'GenerateDescription') {
-        throw new Exception('Ungültige Aktion.');
+        throw new Exception(internautenTranslate('Ungültige Aktion.'));
     }
 
     $productName = trim((string) Tools::getValue('product_name'));
     if ($productName === '') {
-        throw new Exception('Der Produktname fehlt.');
+        throw new Exception(internautenTranslate('Der Produktname fehlt.'));
     }
 
     $module = Module::getInstanceByName('internautenproductai');
     if (!$module || !method_exists($module, 'generateProductDescription')) {
-        throw new Exception('Das Modul konnte nicht geladen werden.');
+        throw new Exception(internautenTranslate('Das Modul konnte nicht geladen werden.'));
     }
 
     $description = $module->generateProductDescription($productName);

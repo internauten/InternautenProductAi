@@ -2,6 +2,15 @@
 
 class AdminInternautenProductAiGenerateController extends ModuleAdminController
 {
+    protected function translate($string)
+    {
+        if ($this->module && method_exists($this->module, 'l')) {
+            return $this->module->l($string, 'AdminInternautenProductAiGenerateController');
+        }
+
+        return $string;
+    }
+
     public function __construct()
     {
         $this->bootstrap = false;
@@ -42,12 +51,12 @@ class AdminInternautenProductAiGenerateController extends ModuleAdminController
 
         try {
             if (!$this->module || !method_exists($this->module, 'generateProductDescription')) {
-                throw new Exception('Das Modul konnte nicht geladen werden.');
+                throw new Exception($this->translate('Das Modul konnte nicht geladen werden.'));
             }
 
             $productName = trim((string) Tools::getValue('product_name'));
             if ($productName === '') {
-                throw new Exception('Der Produktname fehlt.');
+                throw new Exception($this->translate('Der Produktname fehlt.'));
             }
 
             $description = $this->module->generateProductDescription($productName);

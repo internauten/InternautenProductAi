@@ -1,5 +1,16 @@
 (function () {
-    var config = window.internautenProductAi || {};
+    var config = Object.assign({
+        ajaxUrl: '',
+        fallbackAjaxUrl: '',
+        buttonLabel: '',
+        loadingLabel: '',
+        errorNoName: '',
+        genericError: '',
+        generationError: '',
+        invalidJsonError: '',
+        emptyResponseLabel: ''
+    }, window.internautenProductAi || {});
+
     if (!config.ajaxUrl) {
         return;
     }
@@ -51,13 +62,13 @@
         var productName = findProductName(langId);
 
         if (!productName) {
-            window.alert(config.errorNoName || 'Bitte zuerst einen Artikelnamen eintragen.');
+            window.alert(config.errorNoName);
             return;
         }
 
         var originalLabel = button.textContent;
         button.disabled = true;
-        button.textContent = config.loadingLabel || 'Lädt...';
+        button.textContent = config.loadingLabel || originalLabel;
 
         var body = new URLSearchParams();
         body.append('product_name', productName);
@@ -88,13 +99,14 @@
                                 .slice(0, 220);
 
                             throw new Error(
-                                'Der Server hat keine gültige JSON-Antwort geliefert: '
-                                + (preview || 'leere Antwort')
+                                (config.invalidJsonError || config.genericError)
+                                + ' '
+                                + (preview || config.emptyResponseLabel)
                             );
                         }
 
                         if (!response.ok || !data.success) {
-                            throw new Error(data.message || config.genericError || 'Fehler bei der Generierung.');
+                            throw new Error(data.message || config.genericError || config.generationError);
                         }
 
                         return data;
@@ -104,7 +116,7 @@
 
         function tryRequest(index) {
             if (index >= requestUrls.length) {
-                return Promise.reject(new Error(config.genericError || 'Fehler bei der Generierung.'));
+                return Promise.reject(new Error(config.genericError || config.generationError));
             }
 
             return fetchDescription(requestUrls[index]).catch(function (error) {
@@ -121,7 +133,7 @@
                 updateEditor(textarea, data.description || '');
             })
             .catch(function (error) {
-                window.alert(error.message || config.genericError || 'Fehler bei der Generierung.');
+                window.alert(error.message || config.genericError || config.generationError);
             })
             .finally(function () {
                 button.disabled = false;
