@@ -3,23 +3,25 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: ./scripts/tag-release.sh [--push]
+Usage: ./scripts/tag-release.sh [--local-only]
 
 Creates a git tag from the module version defined in:
   internautenproductai/internautenproductai.php
 
+By default, the script creates the local tag and pushes it to `origin`.
+
 Options:
-  --push    Push the created tag to origin
-  -h, --help  Show this help
+  --local-only  Create the tag locally without pushing it
+  -h, --help    Show this help
 EOF
 }
 
-push_tag=false
+push_tag=true
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --push)
-      push_tag=true
+    --local-only)
+      push_tag=false
       shift
       ;;
     -h|--help)
@@ -69,16 +71,19 @@ if [[ -n "$(git -C "${REPO_ROOT}" status --porcelain)" ]]; then
 fi
 
 if git -C "${REPO_ROOT}" rev-parse "${tag}" >/dev/null 2>&1; then
-  echo "Tag ${tag} already exists."
-  exit 0
+  echo "Tag ${tag} already exists locally."
+else
+  git -C "${REPO_ROOT}" tag -a "${tag}" -m "Release ${tag}"
+  echo "Created tag ${tag} from module version ${version}."
 fi
 
-git -C "${REPO_ROOT}" tag -a "${tag}" -m "Release ${tag}"
-echo "Created tag ${tag} from module version ${version}."
-
 if [[ "${push_tag}" == true ]]; then
-  git -C "${REPO_ROOT}" push origin "${tag}"
-  echo "Pushed ${tag} to origin."
+  if git -C "${REPO_ROOT}" ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
+    echo "Tag ${tag} already exists on origin."
+  else
+    git -C "${REPO_ROOT}" push origin "${tag}"
+    echo "Pushed ${tag} to origin."
+  fi
 else
-  echo "Run './scripts/tag-release.sh --push' to push the tag to origin."
+  echo "Created local tag only. Skipped push to origin."
 fi

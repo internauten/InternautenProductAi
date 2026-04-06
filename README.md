@@ -33,11 +33,16 @@ GitHub Releases are created automatically when you push a tag in this format:
 
 - `vX.X.X` (example: `v1.1.2`)
 
-The repository includes a helper script that reads the version from `internautenproductai/internautenproductai.php` and creates the matching tag automatically:
+The repository includes a helper script that reads the version from `internautenproductai/internautenproductai.php`, creates the matching tag and pushes it automatically:
 
 ```bash
 ./scripts/tag-release.sh
-./scripts/tag-release.sh --push
+```
+
+If you only want to create the local tag without pushing it:
+
+```bash
+./scripts/tag-release.sh --local-only
 ```
 
 The workflow then builds and uploads:
