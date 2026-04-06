@@ -31,13 +31,13 @@ Dieses PrestaShop-Modul ergänzt im Produkt-Admin einen Button, mit dem anhand d
 
 GitHub Releases are created automatically when you push a tag in this format:
 
-- vX.X.X (example: v1.1.2)
+- `vX.X.X` (example: `v1.1.2`)
 
-Create and push a release tag:
+The repository includes a helper script that reads the version from `internautenproductai/internautenproductai.php` and creates the matching tag automatically:
 
 ```bash
-git tag v1.1.2
-git push origin v1.1.2
+./scripts/tag-release.sh
+./scripts/tag-release.sh --push
 ```
 
 The workflow then builds and uploads:
