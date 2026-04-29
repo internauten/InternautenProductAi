@@ -62,14 +62,14 @@ Voraussetzungen: im compose hat es unter volumes einen Eintrag - /home/dmo/inter
    ```
 2. set owner, goup and rights
    ```bash
-   sudo chown -R www-data:www-data ~/InternautenProductAi/internautenproductai
-   sudo chmod -R go+w ~/InternautenProductAi/internautenproductai
+   sudo chown -R www-data:www-data ~/internauten/InternautenProductAi/internautenproductai
+   sudo chmod -R go+w ~/internauten/InternautenProductAi/internautenproductai
    ```
 3. Bash in den Container und create symlink and set group:owner
    ```bash
-   sudo ln -s ~/internauten/InternautenProductAi/internautenproductai /var/www/html/modules/internautenproductai
-   sudo chown -h www-data:www-data ~/InternautenProductAi/internautenproductai
-   sudo chown -h www-data:www-data /var/www/html/modules/internautenproductai
+   ln -s /internauten/InternautenProductAi/internautenproductai /var/www/html/modules/internautenproductai
+   (chown -h www-data:www-data ~/InternautenProductAi/internautenproductai)
+   chown -h www-data:www-data /var/www/html/modules/internautenproductai
    ```
 4. Activate and configure Module in Prestashop  
    In Prestashop backend go to Module Manager / not installed Modules and install the module.
