@@ -14,7 +14,7 @@ class InternautenProductAi extends Module
     {
         $this->name = 'internautenproductai';
         $this->tab = 'administration';
-        $this->version = '1.1.0';
+        $this->version = '1.1.1';
         $this->author = 'die.internauten.ch GmbH';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -320,12 +320,12 @@ class InternautenProductAi extends Module
 
     protected function getDefaultSystemPrompt()
     {
-        return $this->l('Du bist ein professioneller E-Commerce-Texter mit sommelier-artigem Stil und Fokus auf hochwertige Spirituosen, insbesondere Whisky. Erstelle elegante, sensorische und glaubwürdige HTML-Produktbeschreibungen für deutschsprachige Onlineshops. Betone bei Whisky – sofern aus dem Produktnamen plausibel ableitbar – Herkunft, Reifung, Duftbild, Geschmacksprofil, Textur und Nachklang. Wenn Details fehlen, bleibe stilvoll und allgemein, ohne Fakten zu erfinden. Die Sprache soll genussorientiert, präzise und hochwertig sein, aber nie übertrieben oder pathetisch. Antworte ausschließlich mit sauberem HTML ohne Markdown-Codeblöcke.');
+        return 'Du bist ein professioneller E-Commerce-Texter mit sommelier-artigem Stil und Fokus auf hochwertige Spirituosen, insbesondere Whisky. Erstelle elegante, sensorische und glaubwürdige HTML-Produktbeschreibungen für deutschsprachige Onlineshops. Betone bei Whisky – sofern aus dem Produktnamen plausibel ableitbar – Herkunft, Reifung, Duftbild, Geschmacksprofil, Textur und Nachklang. Wenn Details fehlen, bleibe stilvoll und allgemein, ohne Fakten zu erfinden. Die Sprache soll genussorientiert, präzise und hochwertig sein, aber nie übertrieben oder pathetisch. Antworte ausschließlich mit sauberem HTML ohne Markdown-Codeblöcke.';
     }
 
     protected function getDefaultPromptTemplate()
     {
-        return $this->l("Erstelle für das Produkt \"{{product_name}}\" eine sommelier-artige Produktbeschreibung für einen deutschsprachigen Onlineshop mit Fokus auf Whisky und Premium-Spirituosen.\n\n"
+        return "Erstelle für das Produkt \"{{product_name}}\" eine sommelier-artige Produktbeschreibung für einen deutschsprachigen Onlineshop mit Fokus auf Whisky und Premium-Spirituosen.\n\n"
             . "Inhalt:\n"
             . "- beschreibe den Whisky mit einer eleganten, sensorischen und genussorientierten Sprache\n"
             . "- gehe, wenn aus dem Namen erkennbar, auf Herkunft, Fassreifung, Duft, Geschmack, Mundgefühl und Nachklang ein\n"
@@ -340,6 +340,6 @@ class InternautenProductAi extends Module
             . "Stil:\n"
             . "- sommelier-artig, präzise, hochwertig und vertrauenswürdig\n"
             . "- bildhaft und genussvoll, aber nicht kitschig oder übertrieben\n"
-            . "- keine Fantasieangaben, keine Hinweise auf KI, keine Emojis, keine Markdown-Codeblöcke");
+            . "- keine Fantasieangaben, keine Hinweise auf KI, keine Emojis, keine Markdown-Codeblöcke";
     }
 }
