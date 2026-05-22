@@ -38,10 +38,52 @@
         return '';
     }
 
+    function findShortDescriptionField(langId) {
+        var selectors = [];
+
+        if (langId) {
+            selectors.push('#form_step1_description_short_' + langId);
+        }
+
+        selectors = selectors.concat([
+            'textarea[id^="form_step1_description_short_"]',
+            'textarea[name*="[description_short]"]'
+        ]);
+
+        for (var i = 0; i < selectors.length; i += 1) {
+            var field = document.querySelector(selectors[i]);
+            if (field) {
+                return field;
+            }
+        }
+
+        return null;
+    }
+
+    function extractFirstParagraphHtml(content) {
+        if (!content) {
+            return '';
+        }
+
+        var paragraphMatch = content.match(/<p\b[^>]*>[\s\S]*?<\/p>/i);
+        if (paragraphMatch && paragraphMatch[0]) {
+            return paragraphMatch[0].trim();
+        }
+
+        var text = content
+            .replace(/<[^>]*>/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        if (!text) {
+            return '';
+        }
+
+        return '<p>' + text + '</p>';
+    }
+
     function updateEditor(textarea, content) {
-        var finalContent = textarea.value && textarea.value.trim()
-            ? textarea.value.trim() + '\n\n' + content
-            : content;
+        var finalContent = content;
 
         textarea.value = finalContent;
 
@@ -59,6 +101,7 @@
     function requestDescription(textarea, button) {
         var match = textarea.id ? textarea.id.match(/_(\d+)$/) : null;
         var langId = match ? match[1] : '';
+        var shortDescriptionField = findShortDescriptionField(langId);
         var productName = findProductName(langId);
 
         if (!productName) {
@@ -130,7 +173,14 @@
 
         tryRequest(0)
             .then(function (data) {
-                updateEditor(textarea, data.description || '');
+                var generatedDescription = data.description || '';
+                var firstParagraph = extractFirstParagraphHtml(generatedDescription);
+
+                updateEditor(textarea, generatedDescription);
+
+                if (shortDescriptionField && firstParagraph) {
+                    updateEditor(shortDescriptionField, firstParagraph);
+                }
             })
             .catch(function (error) {
                 window.alert(error.message || config.genericError || config.generationError);
