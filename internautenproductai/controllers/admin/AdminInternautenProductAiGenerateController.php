@@ -63,6 +63,11 @@ class AdminInternautenProductAiGenerateController extends ModuleAdminController
         $this->ajaxProcessGenerateBulkDescriptions();
     }
 
+    public function displayAjaxSearchBulkProducts()
+    {
+        $this->ajaxProcessSearchBulkProducts();
+    }
+
     public function ajaxProcessGenerateDescription()
     {
         set_error_handler(function ($severity, $message, $file, $line) {
@@ -201,6 +206,96 @@ class AdminInternautenProductAiGenerateController extends ModuleAdminController
                     'failed' => $failedCount,
                 ),
                 'results' => $results,
+            ));
+        } catch (Throwable $exception) {
+            restore_error_handler();
+
+            $this->jsonResponse(array(
+                'success' => false,
+                'message' => $exception->getMessage(),
+            ), 400);
+        }
+    }
+
+    public function ajaxProcessSearchBulkProducts()
+    {
+        set_error_handler(function ($severity, $message, $file, $line) {
+            if (!(error_reporting() & $severity)) {
+                return false;
+            }
+
+            throw new ErrorException($message, 0, $severity, $file, $line);
+        });
+
+        try {
+            $idLang = (int) Tools::getValue('id_lang');
+            if ($idLang <= 0) {
+                $idLang = (int) $this->context->language->id;
+            }
+
+            $idShop = (int) $this->context->shop->id;
+            $queryText = trim((string) Tools::getValue('query'));
+
+            $query = new DbQuery();
+            $query->select('p.id_product, pl.name, p.reference');
+            $query->from('product', 'p');
+            $query->innerJoin(
+                'product_lang',
+                'pl',
+                'pl.id_product = p.id_product'
+                . ' AND pl.id_lang = ' . (int) $idLang
+                . ' AND pl.id_shop = ' . (int) $idShop
+            );
+
+            if ($queryText !== '') {
+                $escaped = pSQL($queryText);
+                $conditions = array(
+                    'pl.name LIKE "%' . $escaped . '%"',
+                    'p.reference LIKE "%' . $escaped . '%"',
+                );
+
+                if (ctype_digit($queryText)) {
+                    $conditions[] = 'p.id_product = ' . (int) $queryText;
+                }
+
+                $query->where('(' . implode(' OR ', $conditions) . ')');
+                $query->orderBy('pl.name ASC');
+            } else {
+                $query->orderBy('p.id_product DESC');
+            }
+
+            $query->limit(100);
+
+            $rows = Db::getInstance()->executeS($query);
+            $products = array();
+
+            foreach ((array) $rows as $row) {
+                $idProduct = isset($row['id_product']) ? (int) $row['id_product'] : 0;
+                $name = isset($row['name']) ? trim((string) $row['name']) : '';
+                $reference = isset($row['reference']) ? trim((string) $row['reference']) : '';
+
+                if ($idProduct <= 0 || $name === '') {
+                    continue;
+                }
+
+                $label = '#' . $idProduct . ' - ' . $name;
+                if ($reference !== '') {
+                    $label .= ' [' . $reference . ']';
+                }
+
+                $products[] = array(
+                    'id_product' => $idProduct,
+                    'name' => $name,
+                    'reference' => $reference,
+                    'label' => $label,
+                );
+            }
+
+            restore_error_handler();
+
+            $this->jsonResponse(array(
+                'success' => true,
+                'products' => $products,
             ));
         } catch (Throwable $exception) {
             restore_error_handler();

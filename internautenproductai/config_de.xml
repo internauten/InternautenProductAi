@@ -2,7 +2,7 @@
 <module>
     <name>internautenproductai</name>
     <displayName><![CDATA[Internauten Product AI]]></displayName>
-    <version><![CDATA[1.1.1]]></version>
+    <version><![CDATA[1.2.0]]></version>
     <description><![CDATA[Erzeugt per ChatGPT eine Produktbeschreibung direkt im PrestaShop-Admin.]]></description>
     <author><![CDATA[die.internauten.ch GmbH]]></author>
     <tab><![CDATA[administration]]></tab>

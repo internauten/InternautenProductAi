@@ -11,6 +11,8 @@ Dieses PrestaShop-Modul ergänzt im Produkt-Admin einen Button, mit dem anhand d
 
 - Button direkt am Beschreibungstext im Produkt-Admin
 - Generierung auf Basis des Produktnamens
+- Batch-Generierung für mehrere ausgewählte Produkte in der Modul-Konfiguration
+- Serverseitige Produktsuche (Name, Referenz, Produkt-ID) für große Kataloge
 - OpenAI API Key, Modell und Prompt im Modul konfigurierbar
 - HTML-Ausgabe für die direkte Nutzung in PrestaShop
 
@@ -19,13 +21,27 @@ Dieses PrestaShop-Modul ergänzt im Produkt-Admin einen Button, mit dem anhand d
 1. Den Ordner `internautenproductai` als ZIP packen oder direkt in `modules/internautenproductai` hochladen.
 2. Im PrestaShop-Backoffice das Modul installieren.
 3. Unter **Module > Internauten Product AI > Konfigurieren** den OpenAI API Key eintragen.
-4. Ein Produkt öffnen und den Button **Mit ChatGPT generieren** nutzen.
+4. Ein Produkt öffnen und den Button **Mit ChatGPT generieren** nutzen oder die Batch-Funktion in der Modul-Konfiguration verwenden.
+
+## Batch-Funktion
+
+In der Modul-Konfiguration steht ein Bereich **Bulk-Generierung für Produkte** zur Verfügung.
+
+- Suche nach Produkten über Name, Referenz oder Produkt-ID
+- Mehrfachauswahl inkl. **Alle sichtbaren auswählen** und **Auswahl leeren**
+- Live-Anzeige, wie viele Produkte aktuell ausgewählt sind
+- Verarbeitung aller ausgewählten Produkte in einem Lauf mit Ergebnisliste (Erfolg/Fehler pro Produkt)
+- Pro verarbeitetem Produkt wird `description` durch den neu generierten Text ersetzt
+- Pro verarbeitetem Produkt wird `description_short` mit dem ersten Absatz der generierten Beschreibung befüllt
+
+Hinweis: Die Batch-Verarbeitung arbeitet in der aktuell im Backoffice ausgewählten Sprache.
 
 ## Hinweise
 
 - Standardmodell: `gpt-4o-mini`
 - Der Prompt kann im Modul angepasst werden.
-- Bestehender Beschreibungstext bleibt erhalten; die neue Beschreibung wird angehängt.
+- Bestehender Beschreibungstext wird bei der Generierung ersetzt.
+- Der erste Absatz der generierten Beschreibung wird zusätzlich in die Kurzbeschreibung übernommen.
 
 ## Release Tagging
 

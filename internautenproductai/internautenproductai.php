@@ -116,7 +116,6 @@ class InternautenProductAi extends Module
     protected function renderBulkGenerationPanel()
     {
         $idLang = (int) $this->context->language->id;
-        $products = $this->getBulkGenerationProducts(500);
 
         $ajaxUrl = $this->context->link->getAdminLink(
             'AdminInternautenProductAiGenerate',
@@ -128,38 +127,27 @@ class InternautenProductAi extends Module
             )
         );
 
+        $searchAjaxUrl = $this->context->link->getAdminLink(
+            'AdminInternautenProductAiGenerate',
+            true,
+            array(),
+            array(
+                'ajax' => 1,
+                'action' => 'SearchBulkProducts',
+            )
+        );
+
         $texts = array(
             'selectRequired' => $this->l('Bitte wähle mindestens ein Produkt aus.'),
             'loading' => $this->l('Beschreibungen werden generiert...'),
+            'searchLoading' => $this->l('Produkte werden geladen...'),
             'done' => $this->l('Fertig: %d erfolgreich, %d fehlgeschlagen.'),
             'genericError' => $this->l('Die Bulk-Generierung konnte nicht durchgeführt werden.'),
             'invalidJsonError' => $this->l('Der Server hat keine gültige JSON-Antwort geliefert.'),
             'emptyResponseLabel' => $this->l('leere Antwort'),
+            'noProductsFound' => $this->l('Keine Produkte gefunden.'),
+            'selectedCount' => $this->l('Ausgewählt: %d Produkte'),
         );
-
-        $optionsHtml = '';
-        foreach ($products as $product) {
-            $idProduct = (int) $product['id_product'];
-            $name = trim((string) $product['name']);
-            $reference = trim((string) $product['reference']);
-
-            if ($name === '') {
-                continue;
-            }
-
-            $label = '#' . $idProduct . ' - ' . $name;
-            if ($reference !== '') {
-                $label .= ' [' . $reference . ']';
-            }
-
-            $optionsHtml .= '<option value="' . $idProduct . '">' . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . '</option>';
-        }
-
-        if ($optionsHtml === '') {
-            $optionsHtml = '<option value="" disabled="disabled">'
-                . htmlspecialchars($this->l('Keine Produkte gefunden.'), ENT_QUOTES, 'UTF-8')
-                . '</option>';
-        }
 
         $html = '';
         $html .= '<div class="panel">';
@@ -169,7 +157,7 @@ class InternautenProductAi extends Module
         $html .= '<label for="internauten-ai-bulk-search">' . htmlspecialchars($this->l('Produkte filtern'), ENT_QUOTES, 'UTF-8') . '</label>';
         $html .= '<input type="text" id="internauten-ai-bulk-search" class="form-control" placeholder="' . htmlspecialchars($this->l('Suche nach ID, Name oder Referenz...'), ENT_QUOTES, 'UTF-8') . '" style="margin-bottom:8px;">';
         $html .= '<label for="internauten-ai-bulk-products">' . htmlspecialchars($this->l('Produkte auswählen'), ENT_QUOTES, 'UTF-8') . '</label>';
-        $html .= '<select id="internauten-ai-bulk-products" class="form-control" multiple="multiple" size="14">' . $optionsHtml . '</select>';
+        $html .= '<select id="internauten-ai-bulk-products" class="form-control" multiple="multiple" size="14"></select>';
         $html .= '<div style="margin-top:8px;">';
         $html .= '<button type="button" id="internauten-ai-bulk-select-visible" class="btn btn-default btn-sm" style="margin-right:8px;">' . htmlspecialchars($this->l('Alle sichtbaren auswählen'), ENT_QUOTES, 'UTF-8') . '</button>';
         $html .= '<button type="button" id="internauten-ai-bulk-clear-selection" class="btn btn-default btn-sm">' . htmlspecialchars($this->l('Auswahl leeren'), ENT_QUOTES, 'UTF-8') . '</button>';
@@ -177,12 +165,14 @@ class InternautenProductAi extends Module
         $html .= '<p class="help-block">' . htmlspecialchars($this->l('Tipp: Mit Strg/Cmd oder Shift kannst du mehrere Produkte markieren.'), ENT_QUOTES, 'UTF-8') . '</p>';
         $html .= '</div>';
         $html .= '<button type="button" id="internauten-ai-bulk-generate" class="btn btn-primary">' . htmlspecialchars($this->l('Beschreibungen für Auswahl generieren'), ENT_QUOTES, 'UTF-8') . '</button>';
+        $html .= '<p id="internauten-ai-bulk-selected-count" style="margin-top:10px; margin-bottom:0;"></p>';
         $html .= '<p id="internauten-ai-bulk-status" style="margin-top:10px;"></p>';
         $html .= '<ul id="internauten-ai-bulk-results" class="list-unstyled" style="margin-top:10px; max-height: 240px; overflow:auto;"></ul>';
         $html .= '</div>';
 
         $scriptConfig = array(
             'ajaxUrl' => $ajaxUrl,
+            'searchAjaxUrl' => $searchAjaxUrl,
             'idLang' => $idLang,
             'texts' => $texts,
         );
@@ -194,28 +184,36 @@ class InternautenProductAi extends Module
             . 'var selectVisible=document.getElementById("internauten-ai-bulk-select-visible");'
             . 'var clearSelection=document.getElementById("internauten-ai-bulk-clear-selection");'
             . 'var button=document.getElementById("internauten-ai-bulk-generate");'
+            . 'var selectedCount=document.getElementById("internauten-ai-bulk-selected-count");'
             . 'var status=document.getElementById("internauten-ai-bulk-status");'
             . 'var results=document.getElementById("internauten-ai-bulk-results");'
-            . 'if(!search||!select||!selectVisible||!clearSelection||!button||!status||!results){return;}'
-            . 'search.addEventListener("input",function(){'
-                . 'var query=(search.value||"").toLowerCase().trim();'
-                . 'Array.prototype.forEach.call(select.options,function(opt){'
-                    . 'if(!opt.value){return;}'
-                    . 'var match=!query||opt.text.toLowerCase().indexOf(query)!==-1;'
-                    . 'opt.hidden=!match;'
-                . '});'
-            . '});'
+            . 'if(!search||!select||!selectVisible||!clearSelection||!button||!selectedCount||!status||!results){return;}'
+            . 'var selectedIds={};'
+            . 'var searchTimer=null;'
+            . 'function parseJsonResponse(response){return response.text().then(function(text){var data=null;try{data=JSON.parse(text);}catch(e){var preview=(text||"").replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim().slice(0,220);throw new Error(cfg.texts.invalidJsonError+" "+(preview||cfg.texts.emptyResponseLabel));}if(!response.ok||!data.success){throw new Error((data&&data.message)||cfg.texts.genericError);}return data;});}'
+            . 'function updateSelectedCount(){selectedCount.textContent=cfg.texts.selectedCount.replace("%d",String(Object.keys(selectedIds).length));}'
+            . 'function renderOptions(products){select.innerHTML="";if(!products.length){var emptyOpt=document.createElement("option");emptyOpt.value="";emptyOpt.disabled=true;emptyOpt.textContent=cfg.texts.noProductsFound;select.appendChild(emptyOpt);return;}products.forEach(function(item){var option=document.createElement("option");var id=String(item.id_product||"");option.value=id;option.textContent=item.label||("#"+id+" - "+(item.name||""));if(selectedIds[id]){option.selected=true;}select.appendChild(option);});}'
+            . 'function syncCurrentSelections(){Array.prototype.forEach.call(select.options,function(opt){if(!opt.value){return;}if(opt.selected){selectedIds[opt.value]=true;}else{delete selectedIds[opt.value];}});updateSelectedCount();}'
+            . 'function fetchProducts(query){var body=new URLSearchParams();body.append("id_lang",String(cfg.idLang));body.append("query",query||"");return fetch(cfg.searchAjaxUrl,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded; charset=UTF-8","X-Requested-With":"XMLHttpRequest"},credentials:"same-origin",body:body.toString()}).then(parseJsonResponse).then(function(data){return data.products||[];});}'
+            . 'function queueSearch(){if(searchTimer){clearTimeout(searchTimer);}searchTimer=setTimeout(function(){syncCurrentSelections();status.textContent=cfg.texts.searchLoading;fetchProducts((search.value||"").trim()).then(function(products){renderOptions(products);status.textContent="";}).catch(function(error){status.textContent=error.message||cfg.texts.genericError;renderOptions([]);});},250);}'
+            . 'search.addEventListener("input",queueSearch);'
+            . 'select.addEventListener("change",syncCurrentSelections);'
             . 'selectVisible.addEventListener("click",function(){'
                 . 'Array.prototype.forEach.call(select.options,function(opt){'
                     . 'if(!opt.value){return;}'
-                    . 'if(!opt.hidden){opt.selected=true;}'
+                    . 'opt.selected=true;'
+                    . 'selectedIds[opt.value]=true;'
                 . '});'
+                . 'updateSelectedCount();'
             . '});'
             . 'clearSelection.addEventListener("click",function(){'
+                . 'selectedIds={};'
                 . 'Array.prototype.forEach.call(select.options,function(opt){opt.selected=false;});'
+                . 'updateSelectedCount();'
             . '});'
             . 'button.addEventListener("click",function(){'
-                . 'var selected=Array.prototype.slice.call(select.options).filter(function(opt){return opt.selected&&opt.value;}).map(function(opt){return opt.value;});'
+                . 'syncCurrentSelections();'
+                . 'var selected=Object.keys(selectedIds);'
                 . 'if(!selected.length){window.alert(cfg.texts.selectRequired);return;}'
                 . 'button.disabled=true;'
                 . 'status.textContent=cfg.texts.loading;'
@@ -224,7 +222,7 @@ class InternautenProductAi extends Module
                 . 'body.append("id_lang",String(cfg.idLang));'
                 . 'selected.forEach(function(id){body.append("product_ids[]",id);});'
                 . 'fetch(cfg.ajaxUrl,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded; charset=UTF-8","X-Requested-With":"XMLHttpRequest"},credentials:"same-origin",body:body.toString()})'
-                    . '.then(function(response){return response.text().then(function(text){var data=null;try{data=JSON.parse(text);}catch(e){var preview=(text||"").replace(/<[^>]*>/g," ").replace(/\s+/g," ").trim().slice(0,220);throw new Error(cfg.texts.invalidJsonError+" "+(preview||cfg.texts.emptyResponseLabel));}if(!response.ok||!data.success){throw new Error((data&&data.message)||cfg.texts.genericError);}return data;});})'
+                    . '.then(parseJsonResponse)'
                     . '.then(function(data){'
                         . 'var summary=data.summary||{success:0,failed:0};'
                         . 'status.textContent=cfg.texts.done.replace("%d",String(summary.success||0)).replace("%d",String(summary.failed||0));'
@@ -233,29 +231,11 @@ class InternautenProductAi extends Module
                     . '.catch(function(error){status.textContent=error.message||cfg.texts.genericError;})'
                     . '.finally(function(){button.disabled=false;});'
             . '});'
+                    . 'updateSelectedCount();'
+            . 'queueSearch();'
         . '})();</script>';
 
         return $html;
-    }
-
-    protected function getBulkGenerationProducts($limit)
-    {
-        $idLang = (int) $this->context->language->id;
-        $idShop = (int) $this->context->shop->id;
-
-        $query = new DbQuery();
-        $query->select('p.id_product, pl.name, p.reference');
-        $query->from('product', 'p');
-        $query->innerJoin(
-            'product_lang',
-            'pl',
-            'pl.id_product = p.id_product AND pl.id_lang = ' . $idLang . ' AND pl.id_shop = ' . $idShop
-        );
-        $query->orderBy('p.id_product DESC');
-        $query->limit((int) $limit);
-
-        $rows = Db::getInstance()->executeS($query);
-        return is_array($rows) ? $rows : array();
     }
 
     protected function renderForm()
