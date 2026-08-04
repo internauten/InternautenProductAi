@@ -269,6 +269,7 @@ class AdminInternautenProductAiGenerateController extends ModuleAdminController
 
             $idShop = (int) $this->context->shop->id;
             $queryText = trim((string) Tools::getValue('query'));
+            $categoryId = (int) Tools::getValue('category_id');
 
             $query = new DbQuery();
             $query->select('p.id_product, pl.name, p.reference, pl.description_short');
@@ -282,6 +283,14 @@ class AdminInternautenProductAiGenerateController extends ModuleAdminController
             );
             $query->where('p.active = 1');
             $query->where('CHAR_LENGTH(TRIM(COALESCE(pl.description_short, ""))) < 20');
+
+            if ($categoryId > 0) {
+                $query->innerJoin(
+                    'category_product',
+                    'cp',
+                    'cp.id_product = p.id_product AND cp.id_category = ' . (int) $categoryId
+                );
+            }
 
             if ($queryText !== '') {
                 $escaped = pSQL($queryText);
