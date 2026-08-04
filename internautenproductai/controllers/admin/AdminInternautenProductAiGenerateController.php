@@ -280,6 +280,7 @@ class AdminInternautenProductAiGenerateController extends ModuleAdminController
                 . ' AND pl.id_lang = ' . (int) $idLang
                 . ' AND pl.id_shop = ' . (int) $idShop
             );
+            $query->where('p.active = 1');
             $query->where('CHAR_LENGTH(TRIM(COALESCE(pl.description_short, ""))) < 20');
 
             if ($queryText !== '') {
