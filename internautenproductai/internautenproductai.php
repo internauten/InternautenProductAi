@@ -20,7 +20,7 @@ class InternautenProductAi extends Module
     {
         $this->name = 'internautenproductai';
         $this->tab = 'administration';
-        $this->version = '2.1.1';
+        $this->version = '2.2.1';
         $this->author = 'die.internauten.ch GmbH';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -160,7 +160,7 @@ class InternautenProductAi extends Module
             array(),
             array(
                 'ajax' => 1,
-                'action' => 'GenerateBulkDescriptions',
+                'action' => 'GenerateBulkDescriptionSingle',
             )
         );
 
@@ -176,7 +176,8 @@ class InternautenProductAi extends Module
 
         $texts = array(
             'selectRequired' => $this->l('Bitte wähle mindestens ein Produkt aus.'),
-            'loading' => $this->l('Beschreibungen werden generiert...'),
+            'loading' => $this->l('Beschreibungen werden im Hintergrund generiert...'),
+            'progress' => $this->l('Verarbeite %d von %d...'),
             'searchLoading' => $this->l('Produkte werden geladen...'),
             'done' => $this->l('Fertig: %d erfolgreich, %d fehlgeschlagen.'),
             'genericError' => $this->l('Die Bulk-Generierung konnte nicht durchgeführt werden.'),
@@ -273,6 +274,34 @@ class InternautenProductAi extends Module
                 . 'Array.prototype.forEach.call(select.options,function(opt){opt.selected=false;});'
                 . 'updateSelectedCount();'
             . '});'
+            . 'function appendResult(idProduct,name,message,success){'
+                . 'var li=document.createElement("li");'
+                . 'li.textContent="#"+idProduct+" - "+(name||"")+": "+(message||"");'
+                . 'li.style.color=success?"#2e7d32":"#c62828";'
+                . 'results.appendChild(li);'
+            . '}'
+            . 'function processQueue(ids){'
+                . 'var total=ids.length;var index=0;var successCount=0;var failedCount=0;'
+                . 'function next(){'
+                    . 'if(index>=total){'
+                        . 'status.textContent=cfg.texts.done.replace("%d",String(successCount)).replace("%d",String(failedCount));'
+                        . 'button.disabled=false;'
+                        . 'return;'
+                    . '}'
+                    . 'var id=ids[index];'
+                    . 'index+=1;'
+                    . 'status.textContent=cfg.texts.progress.replace("%d",String(index)).replace("%d",String(total));'
+                    . 'var body=new URLSearchParams();'
+                    . 'body.append("id_lang",String(cfg.idLang));'
+                    . 'body.append("id_product",String(id));'
+                    . 'fetch(cfg.ajaxUrl,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded; charset=UTF-8","X-Requested-With":"XMLHttpRequest"},credentials:"same-origin",body:body.toString()})'
+                        . '.then(parseJsonResponse)'
+                        . '.then(function(data){successCount+=1;appendResult(data.id_product,data.name,data.message,true);})'
+                        . '.catch(function(error){failedCount+=1;appendResult(id,"",error.message||cfg.texts.genericError,false);})'
+                        . '.finally(next);'
+                . '}'
+                . 'next();'
+            . '}'
             . 'button.addEventListener("click",function(){'
                 . 'syncCurrentSelections();'
                 . 'var selected=Object.keys(selectedIds);'
@@ -280,18 +309,7 @@ class InternautenProductAi extends Module
                 . 'button.disabled=true;'
                 . 'status.textContent=cfg.texts.loading;'
                 . 'results.innerHTML="";'
-                . 'var body=new URLSearchParams();'
-                . 'body.append("id_lang",String(cfg.idLang));'
-                . 'selected.forEach(function(id){body.append("product_ids[]",id);});'
-                . 'fetch(cfg.ajaxUrl,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded; charset=UTF-8","X-Requested-With":"XMLHttpRequest"},credentials:"same-origin",body:body.toString()})'
-                    . '.then(parseJsonResponse)'
-                    . '.then(function(data){'
-                        . 'var summary=data.summary||{success:0,failed:0};'
-                        . 'status.textContent=cfg.texts.done.replace("%d",String(summary.success||0)).replace("%d",String(summary.failed||0));'
-                        . '(data.results||[]).forEach(function(item){var li=document.createElement("li");li.textContent="#"+item.id_product+" - "+(item.name||"")+": "+(item.message||"");li.style.color=item.success?"#2e7d32":"#c62828";results.appendChild(li);});'
-                    . '})'
-                    . '.catch(function(error){status.textContent=error.message||cfg.texts.genericError;})'
-                    . '.finally(function(){button.disabled=false;});'
+                . 'processQueue(selected);'
             . '});'
                     . 'updateSelectedCount();'
             . 'queueSearch();'

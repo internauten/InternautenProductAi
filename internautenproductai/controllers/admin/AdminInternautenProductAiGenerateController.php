@@ -58,14 +58,25 @@ class AdminInternautenProductAiGenerateController extends ModuleAdminController
         $this->ajaxProcessGenerateDescription();
     }
 
-    public function displayAjaxGenerateBulkDescriptions()
+    public function displayAjaxGenerateBulkDescriptionSingle()
     {
-        $this->ajaxProcessGenerateBulkDescriptions();
+        $this->ajaxProcessGenerateBulkDescriptionSingle();
     }
 
     public function displayAjaxSearchBulkProducts()
     {
         $this->ajaxProcessSearchBulkProducts();
+    }
+
+    protected function resolveLangIdByIso($isoCode)
+    {
+        $row = Db::getInstance()->getRow(
+            'SELECT `id_lang`'
+            . ' FROM `' . _DB_PREFIX_ . 'lang`'
+            . ' WHERE `active` = 1 AND `iso_code` = "' . pSQL($isoCode) . '"'
+        );
+
+        return isset($row['id_lang']) ? (int) $row['id_lang'] : 0;
     }
 
     public function ajaxProcessGenerateDescription()
@@ -115,7 +126,11 @@ class AdminInternautenProductAiGenerateController extends ModuleAdminController
         }
     }
 
-    public function ajaxProcessGenerateBulkDescriptions()
+    /**
+     * Processes exactly one product per request so the client can work through
+     * the selected list in the background and report progress item by item.
+     */
+    public function ajaxProcessGenerateBulkDescriptionSingle()
     {
         set_error_handler(function ($severity, $message, $file, $line) {
             if (!(error_reporting() & $severity)) {
@@ -125,27 +140,16 @@ class AdminInternautenProductAiGenerateController extends ModuleAdminController
             throw new ErrorException($message, 0, $severity, $file, $line);
         });
 
+        $productName = '';
+        $idProduct = (int) Tools::getValue('id_product');
+
         try {
             if (!$this->module || !method_exists($this->module, 'generateProductDescription')) {
                 throw new Exception($this->translate('Das Modul konnte nicht geladen werden.'));
             }
 
-            $rawIds = Tools::getValue('product_ids');
-            if (!is_array($rawIds)) {
-                $rawIds = $rawIds !== null ? explode(',', (string) $rawIds) : array();
-            }
-
-            $productIds = array();
-            foreach ($rawIds as $rawId) {
-                $idProduct = (int) $rawId;
-                if ($idProduct > 0) {
-                    $productIds[$idProduct] = $idProduct;
-                }
-            }
-            $productIds = array_values($productIds);
-
-            if (!$productIds) {
-                throw new Exception($this->translate('Es wurden keine Produkte ausgewählt.'));
+            if ($idProduct <= 0) {
+                throw new Exception($this->translate('Es wurde kein Produkt ausgewählt.'));
             }
 
             $idLang = (int) Tools::getValue('id_lang');
@@ -153,99 +157,72 @@ class AdminInternautenProductAiGenerateController extends ModuleAdminController
                 $idLang = (int) $this->context->language->id;
             }
 
-            $results = array();
-            $successCount = 0;
-            $failedCount = 0;
+            $germanLangId = $this->resolveLangIdByIso('de');
+            $englishLangId = $this->resolveLangIdByIso('en');
+            $nameLangId = $germanLangId > 0 ? $germanLangId : $idLang;
 
-            foreach ($productIds as $idProduct) {
-                try {
-                    $row = Db::getInstance()->getRow(
-                        'SELECT `name`'
-                        . ' FROM `' . _DB_PREFIX_ . 'product_lang`'
-                        . ' WHERE `id_product` = ' . (int) $idProduct
-                        . ' AND `id_lang` = ' . (int) $idLang
-                        . ' ORDER BY `id_shop` ASC'
-                    );
+            $row = Db::getInstance()->getRow(
+                'SELECT `name`'
+                . ' FROM `' . _DB_PREFIX_ . 'product_lang`'
+                . ' WHERE `id_product` = ' . (int) $idProduct
+                . ' AND `id_lang` = ' . (int) $nameLangId
+                . ' ORDER BY `id_shop` ASC'
+            );
 
-                    $productName = isset($row['name']) ? trim((string) $row['name']) : '';
-                    if ($productName === '') {
-                        throw new Exception($this->translate('Produkt nicht gefunden oder ohne Namen.'));
-                    }
+            $productName = isset($row['name']) ? trim((string) $row['name']) : '';
+            if ($productName === '') {
+                throw new Exception($this->translate('Produkt nicht gefunden oder ohne Namen.'));
+            }
 
-                    $generatedDescription = $this->module->generateProductDescription($productName);
-                    $translatedDescription = $this->module->translateText($generatedDescription, 'English');
-                    $finalDescription = $generatedDescription;
-                    $shortDescription = $this->extractFirstParagraphHtml($generatedDescription);
-                    $translatedShortDescription = $this->extractFirstParagraphHtml($translatedDescription);
+            $germanDescription = $this->module->generateProductDescription($productName);
+            $germanShortDescription = $this->extractFirstParagraphHtml($germanDescription);
 
-                    $updated = (bool) Db::getInstance()->update(
-                        'product_lang',
-                        array(
-                            'description' => pSQL($finalDescription, true),
-                            'description_short' => pSQL($shortDescription, true),
-                        ),
-                        '`id_product` = ' . (int) $idProduct . ' AND `id_lang` = ' . (int) $idLang
-                    );
+            $englishDescription = $this->module->translateText($germanDescription, 'English');
+            $englishShortDescription = $this->extractFirstParagraphHtml($englishDescription);
 
-                    if ($translatedDescription !== '') {
-                        $englishLang = Db::getInstance()->getRow(
-                            'SELECT `id_lang`'
-                            . ' FROM `' . _DB_PREFIX_ . 'lang`'
-                            . ' WHERE `active` = 1 AND `iso_code` = "en"'
-                        );
+            $updated = false;
 
-                        if ($englishLang && isset($englishLang['id_lang'])) {
-                            $targetLangId = (int) $englishLang['id_lang'];
-                            if ($targetLangId !== $idLang) {
-                                Db::getInstance()->update(
-                                    'product_lang',
-                                    array(
-                                        'description' => pSQL($translatedDescription, true),
-                                        'description_short' => pSQL($translatedShortDescription, true),
-                                    ),
-                                    '`id_product` = ' . (int) $idProduct . ' AND `id_lang` = ' . (int) $targetLangId
-                                );
-                            }
-                        }
-                    }
+            if ($germanLangId > 0) {
+                $updated = (bool) Db::getInstance()->update(
+                    'product_lang',
+                    array(
+                        'description' => pSQL($germanDescription, true),
+                        'description_short' => pSQL($germanShortDescription, true),
+                    ),
+                    '`id_product` = ' . (int) $idProduct . ' AND `id_lang` = ' . (int) $germanLangId
+                ) || $updated;
+            }
 
-                    if (!$updated) {
-                        throw new Exception($this->translate('Beschreibung konnte nicht gespeichert werden.'));
-                    }
+            if ($englishLangId > 0 && $englishDescription !== '') {
+                $updated = (bool) Db::getInstance()->update(
+                    'product_lang',
+                    array(
+                        'description' => pSQL($englishDescription, true),
+                        'description_short' => pSQL($englishShortDescription, true),
+                    ),
+                    '`id_product` = ' . (int) $idProduct . ' AND `id_lang` = ' . (int) $englishLangId
+                ) || $updated;
+            }
 
-                    $successCount += 1;
-                    $results[] = array(
-                        'id_product' => (int) $idProduct,
-                        'name' => $productName,
-                        'success' => true,
-                        'message' => $this->translate('Beschreibung aktualisiert.'),
-                    );
-                } catch (Throwable $exception) {
-                    $failedCount += 1;
-                    $results[] = array(
-                        'id_product' => (int) $idProduct,
-                        'name' => isset($productName) ? $productName : '',
-                        'success' => false,
-                        'message' => $exception->getMessage(),
-                    );
-                }
+            if (!$updated) {
+                throw new Exception($this->translate('Beschreibung konnte nicht gespeichert werden.'));
             }
 
             restore_error_handler();
 
             $this->jsonResponse(array(
                 'success' => true,
-                'summary' => array(
-                    'success' => $successCount,
-                    'failed' => $failedCount,
-                ),
-                'results' => $results,
+                'id_product' => (int) $idProduct,
+                'name' => $productName,
+                'message' => $this->translate('Beschreibung (Deutsch/Englisch) aktualisiert.'),
             ));
         } catch (Throwable $exception) {
             restore_error_handler();
 
             $this->jsonResponse(array(
                 'success' => false,
+                'id_product' => (int) $idProduct,
+                'name' => $productName,
                 'message' => $exception->getMessage(),
             ), 400);
         }
