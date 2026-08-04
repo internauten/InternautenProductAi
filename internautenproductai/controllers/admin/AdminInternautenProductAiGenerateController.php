@@ -173,8 +173,10 @@ class AdminInternautenProductAiGenerateController extends ModuleAdminController
                     }
 
                     $generatedDescription = $this->module->generateProductDescription($productName);
+                    $translatedDescription = $this->module->translateText($generatedDescription, 'English');
                     $finalDescription = $generatedDescription;
                     $shortDescription = $this->extractFirstParagraphHtml($generatedDescription);
+                    $translatedShortDescription = $this->extractFirstParagraphHtml($translatedDescription);
 
                     $updated = (bool) Db::getInstance()->update(
                         'product_lang',
@@ -184,6 +186,28 @@ class AdminInternautenProductAiGenerateController extends ModuleAdminController
                         ),
                         '`id_product` = ' . (int) $idProduct . ' AND `id_lang` = ' . (int) $idLang
                     );
+
+                    if ($translatedDescription !== '') {
+                        $englishLang = Db::getInstance()->getRow(
+                            'SELECT `id_lang`'
+                            . ' FROM `' . _DB_PREFIX_ . 'lang`'
+                            . ' WHERE `active` = 1 AND `iso_code` = "en"'
+                        );
+
+                        if ($englishLang && isset($englishLang['id_lang'])) {
+                            $targetLangId = (int) $englishLang['id_lang'];
+                            if ($targetLangId !== $idLang) {
+                                Db::getInstance()->update(
+                                    'product_lang',
+                                    array(
+                                        'description' => pSQL($translatedDescription, true),
+                                        'description_short' => pSQL($translatedShortDescription, true),
+                                    ),
+                                    '`id_product` = ' . (int) $idProduct . ' AND `id_lang` = ' . (int) $targetLangId
+                                );
+                            }
+                        }
+                    }
 
                     if (!$updated) {
                         throw new Exception($this->translate('Beschreibung konnte nicht gespeichert werden.'));
@@ -247,7 +271,7 @@ class AdminInternautenProductAiGenerateController extends ModuleAdminController
             $queryText = trim((string) Tools::getValue('query'));
 
             $query = new DbQuery();
-            $query->select('p.id_product, pl.name, p.reference');
+            $query->select('p.id_product, pl.name, p.reference, pl.description_short');
             $query->from('product', 'p');
             $query->innerJoin(
                 'product_lang',
@@ -256,6 +280,7 @@ class AdminInternautenProductAiGenerateController extends ModuleAdminController
                 . ' AND pl.id_lang = ' . (int) $idLang
                 . ' AND pl.id_shop = ' . (int) $idShop
             );
+            $query->where('CHAR_LENGTH(TRIM(COALESCE(pl.description_short, ""))) < 20');
 
             if ($queryText !== '') {
                 $escaped = pSQL($queryText);
