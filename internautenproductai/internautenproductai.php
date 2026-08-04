@@ -20,7 +20,7 @@ class InternautenProductAi extends Module
     {
         $this->name = 'internautenproductai';
         $this->tab = 'administration';
-        $this->version = '2.2.1';
+        $this->version = '2.2.2';
         $this->author = 'die.internauten.ch GmbH';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -286,6 +286,9 @@ class InternautenProductAi extends Module
                     . 'if(index>=total){'
                         . 'status.textContent=cfg.texts.done.replace("%d",String(successCount)).replace("%d",String(failedCount));'
                         . 'button.disabled=false;'
+                        . 'selectedIds={};'
+                        . 'updateSelectedCount();'
+                        . 'queueSearch();'
                         . 'return;'
                     . '}'
                     . 'var id=ids[index];'
