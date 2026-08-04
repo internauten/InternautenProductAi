@@ -7,6 +7,11 @@ class InternautenProductAi extends Module
 {
     const CONFIG_API_KEY = 'IPA_OPENAI_API_KEY';
     const CONFIG_MODEL = 'IPA_OPENAI_MODEL';
+    const CONFIG_TEMPERATURE = 'IPA_OPENAI_TEMPERATURE';
+    const CONFIG_MAX_TOKENS = 'IPA_OPENAI_MAX_TOKENS';
+    const CONFIG_TOP_P = 'IPA_OPENAI_TOP_P';
+    const CONFIG_REASONING_EFFORT = 'IPA_OPENAI_REASONING_EFFORT';
+    const CONFIG_EXTRA_PARAMETERS = 'IPA_OPENAI_EXTRA_PARAMETERS';
     const CONFIG_SYSTEM_PROMPT = 'IPA_SYSTEM_PROMPT';
     const CONFIG_PROMPT_TEMPLATE = 'IPA_PROMPT_TEMPLATE';
 
@@ -14,7 +19,7 @@ class InternautenProductAi extends Module
     {
         $this->name = 'internautenproductai';
         $this->tab = 'administration';
-        $this->version = '1.2.1';
+        $this->version = '1.3.0';
         $this->author = 'die.internauten.ch GmbH';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -35,6 +40,11 @@ class InternautenProductAi extends Module
             && $this->installTab()
             && $this->registerHook('displayBackOfficeHeader')
             && Configuration::updateValue(self::CONFIG_MODEL, 'gpt-4o-mini')
+            && Configuration::updateValue(self::CONFIG_TEMPERATURE, '0.7')
+            && Configuration::updateValue(self::CONFIG_MAX_TOKENS, '')
+            && Configuration::updateValue(self::CONFIG_TOP_P, '')
+            && Configuration::updateValue(self::CONFIG_REASONING_EFFORT, '')
+            && Configuration::updateValue(self::CONFIG_EXTRA_PARAMETERS, '')
             && Configuration::updateValue(self::CONFIG_SYSTEM_PROMPT, $this->getDefaultSystemPrompt())
             && Configuration::updateValue(self::CONFIG_PROMPT_TEMPLATE, $this->getDefaultPromptTemplate());
     }
@@ -43,6 +53,11 @@ class InternautenProductAi extends Module
     {
         return Configuration::deleteByName(self::CONFIG_API_KEY)
             && Configuration::deleteByName(self::CONFIG_MODEL)
+            && Configuration::deleteByName(self::CONFIG_TEMPERATURE)
+            && Configuration::deleteByName(self::CONFIG_MAX_TOKENS)
+            && Configuration::deleteByName(self::CONFIG_TOP_P)
+            && Configuration::deleteByName(self::CONFIG_REASONING_EFFORT)
+            && Configuration::deleteByName(self::CONFIG_EXTRA_PARAMETERS)
             && Configuration::deleteByName(self::CONFIG_SYSTEM_PROMPT)
             && Configuration::deleteByName(self::CONFIG_PROMPT_TEMPLATE)
             && $this->uninstallTab()
@@ -87,11 +102,20 @@ class InternautenProductAi extends Module
         if (Tools::isSubmit('submitInternautenProductAi')) {
             $apiKey = trim((string) Tools::getValue(self::CONFIG_API_KEY));
             $model = trim((string) Tools::getValue(self::CONFIG_MODEL));
+            $temperature = trim((string) Tools::getValue(self::CONFIG_TEMPERATURE));
+            $maxTokens = trim((string) Tools::getValue(self::CONFIG_MAX_TOKENS));
+            $topP = trim((string) Tools::getValue(self::CONFIG_TOP_P));
+            $reasoningEffort = trim((string) Tools::getValue(self::CONFIG_REASONING_EFFORT));
+            $extraParameters = trim((string) Tools::getValue(self::CONFIG_EXTRA_PARAMETERS));
             $systemPrompt = trim((string) Tools::getValue(self::CONFIG_SYSTEM_PROMPT));
             $promptTemplate = trim((string) Tools::getValue(self::CONFIG_PROMPT_TEMPLATE));
 
             if ($model === '') {
                 $model = 'gpt-4o-mini';
+            }
+
+            if ($temperature === '') {
+                $temperature = '0.7';
             }
 
             if ($systemPrompt === '') {
@@ -102,12 +126,21 @@ class InternautenProductAi extends Module
                 $promptTemplate = $this->getDefaultPromptTemplate();
             }
 
-            Configuration::updateValue(self::CONFIG_API_KEY, $apiKey);
-            Configuration::updateValue(self::CONFIG_MODEL, $model);
-            Configuration::updateValue(self::CONFIG_SYSTEM_PROMPT, $systemPrompt);
-            Configuration::updateValue(self::CONFIG_PROMPT_TEMPLATE, $promptTemplate);
+            if ($extraParameters !== '' && !$this->isValidJsonObject($extraParameters)) {
+                $output .= $this->displayError($this->l('Die zusätzlichen Parameter müssen als gültiges JSON-Objekt angegeben werden.'));
+            } else {
+                Configuration::updateValue(self::CONFIG_API_KEY, $apiKey);
+                Configuration::updateValue(self::CONFIG_MODEL, $model);
+                Configuration::updateValue(self::CONFIG_TEMPERATURE, $temperature);
+                Configuration::updateValue(self::CONFIG_MAX_TOKENS, $maxTokens);
+                Configuration::updateValue(self::CONFIG_TOP_P, $topP);
+                Configuration::updateValue(self::CONFIG_REASONING_EFFORT, $reasoningEffort);
+                Configuration::updateValue(self::CONFIG_EXTRA_PARAMETERS, $extraParameters);
+                Configuration::updateValue(self::CONFIG_SYSTEM_PROMPT, $systemPrompt);
+                Configuration::updateValue(self::CONFIG_PROMPT_TEMPLATE, $promptTemplate);
 
-            $output .= $this->displayConfirmation($this->l('Die Einstellungen wurden gespeichert.'));
+                $output .= $this->displayConfirmation($this->l('Die Einstellungen wurden gespeichert.'));
+            }
         }
 
         return $output . $this->renderForm() . $this->renderBulkGenerationPanel();
@@ -252,6 +285,11 @@ class InternautenProductAi extends Module
         $helper->fields_value = array(
             self::CONFIG_API_KEY => Configuration::get(self::CONFIG_API_KEY),
             self::CONFIG_MODEL => Configuration::get(self::CONFIG_MODEL) ?: 'gpt-4o-mini',
+            self::CONFIG_TEMPERATURE => Configuration::get(self::CONFIG_TEMPERATURE) ?: '0.7',
+            self::CONFIG_MAX_TOKENS => Configuration::get(self::CONFIG_MAX_TOKENS),
+            self::CONFIG_TOP_P => Configuration::get(self::CONFIG_TOP_P),
+            self::CONFIG_REASONING_EFFORT => Configuration::get(self::CONFIG_REASONING_EFFORT),
+            self::CONFIG_EXTRA_PARAMETERS => Configuration::get(self::CONFIG_EXTRA_PARAMETERS),
             self::CONFIG_SYSTEM_PROMPT => Configuration::get(self::CONFIG_SYSTEM_PROMPT) ?: $this->getDefaultSystemPrompt(),
             self::CONFIG_PROMPT_TEMPLATE => Configuration::get(self::CONFIG_PROMPT_TEMPLATE) ?: $this->getDefaultPromptTemplate(),
         );
@@ -276,6 +314,43 @@ class InternautenProductAi extends Module
                         'name' => self::CONFIG_MODEL,
                         'required' => true,
                         'desc' => $this->l('Empfohlen: gpt-4o-mini'),
+                    ),
+                    array(
+                        'type' => 'text',
+                        'label' => $this->l('Temperatur'),
+                        'name' => self::CONFIG_TEMPERATURE,
+                        'required' => false,
+                        'desc' => $this->l('Optional. Standardwert: 0.7. Für neuere Modelle kann der Wert leer gelassen werden.'),
+                    ),
+                    array(
+                        'type' => 'text',
+                        'label' => $this->l('Max Tokens'),
+                        'name' => self::CONFIG_MAX_TOKENS,
+                        'required' => false,
+                        'desc' => $this->l('Optional. Beispiel: 600. Manche Modelle nutzen stattdessen max_completion_tokens.'),
+                    ),
+                    array(
+                        'type' => 'text',
+                        'label' => $this->l('Top P'),
+                        'name' => self::CONFIG_TOP_P,
+                        'required' => false,
+                        'desc' => $this->l('Optional. Werte zwischen 0 und 1.'),
+                    ),
+                    array(
+                        'type' => 'text',
+                        'label' => $this->l('Reasoning Effort'),
+                        'name' => self::CONFIG_REASONING_EFFORT,
+                        'required' => false,
+                        'desc' => $this->l('Optional. Beispiel: low, medium oder high.'),
+                    ),
+                    array(
+                        'type' => 'textarea',
+                        'label' => $this->l('Zusätzliche Parameter'),
+                        'name' => self::CONFIG_EXTRA_PARAMETERS,
+                        'rows' => 6,
+                        'cols' => 80,
+                        'autoload_rte' => false,
+                        'desc' => $this->l('Optionales JSON-Objekt für zusätzliche Modellparameter, z. B. {"max_completion_tokens": 800, "reasoning": {"effort": "medium"}}.'),
                     ),
                     array(
                         'type' => 'textarea',
@@ -358,6 +433,11 @@ class InternautenProductAi extends Module
     {
         $apiKey = trim((string) Configuration::get(self::CONFIG_API_KEY));
         $model = trim((string) (Configuration::get(self::CONFIG_MODEL) ?: 'gpt-4o-mini'));
+        $temperature = trim((string) (Configuration::get(self::CONFIG_TEMPERATURE) ?: '0.7'));
+        $maxTokens = trim((string) Configuration::get(self::CONFIG_MAX_TOKENS));
+        $topP = trim((string) Configuration::get(self::CONFIG_TOP_P));
+        $reasoningEffort = trim((string) Configuration::get(self::CONFIG_REASONING_EFFORT));
+        $extraParameters = trim((string) Configuration::get(self::CONFIG_EXTRA_PARAMETERS));
         $systemPrompt = trim((string) (Configuration::get(self::CONFIG_SYSTEM_PROMPT) ?: $this->getDefaultSystemPrompt()));
         $promptTemplate = trim((string) (Configuration::get(self::CONFIG_PROMPT_TEMPLATE) ?: $this->getDefaultPromptTemplate()));
 
@@ -395,8 +475,27 @@ class InternautenProductAi extends Module
                     'content' => $userPrompt,
                 ),
             ),
-            'temperature' => 0.7,
         );
+
+        if ($temperature !== '' && is_numeric($temperature)) {
+            $payload['temperature'] = (float) $temperature;
+        }
+
+        if ($maxTokens !== '' && is_numeric($maxTokens)) {
+            $payload['max_tokens'] = (int) $maxTokens;
+        }
+
+        if ($topP !== '' && is_numeric($topP)) {
+            $payload['top_p'] = (float) $topP;
+        }
+
+        if ($reasoningEffort !== '') {
+            $payload['reasoning_effort'] = $reasoningEffort;
+        }
+
+        if ($extraParameters !== '') {
+            $payload = array_replace($payload, $this->parseExtraParameters($extraParameters));
+        }
 
         $curl = curl_init('https://api.openai.com/v1/chat/completions');
 
@@ -441,6 +540,41 @@ class InternautenProductAi extends Module
         }
 
         return $content;
+    }
+
+    protected function isValidJsonObject($value)
+    {
+        $trimmed = trim((string) $value);
+        if ($trimmed === '') {
+            return true;
+        }
+
+        if ($trimmed[0] !== '{') {
+            return false;
+        }
+
+        $decoded = json_decode($trimmed, true);
+
+        return is_array($decoded);
+    }
+
+    protected function parseExtraParameters($value)
+    {
+        $trimmed = trim((string) $value);
+        if ($trimmed === '') {
+            return array();
+        }
+
+        if ($trimmed[0] !== '{') {
+            throw new Exception($this->l('Die zusätzlichen Parameter müssen als gültiges JSON-Objekt angegeben werden.'));
+        }
+
+        $decoded = json_decode($trimmed, true);
+        if (!is_array($decoded)) {
+            throw new Exception($this->l('Die zusätzlichen Parameter müssen als gültiges JSON-Objekt angegeben werden.'));
+        }
+
+        return $decoded;
     }
 
     protected function getDefaultSystemPrompt()

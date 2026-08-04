@@ -11,6 +11,17 @@ $_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('OpenAI
 $_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Trage hier deinen OpenAI API Key ein.')] = 'Enter your OpenAI API key here.';
 $_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Modell')] = 'Model';
 $_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Empfohlen: gpt-4o-mini')] = 'Recommended: gpt-4o-mini';
+$_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Temperatur')] = 'Temperature';
+$_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Optional. Standardwert: 0.7. Für neuere Modelle kann der Wert leer gelassen werden.')] = 'Optional. Default value: 0.7. For newer models you can leave this empty.';
+$_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Max Tokens')] = 'Max tokens';
+$_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Optional. Beispiel: 600. Manche Modelle nutzen stattdessen max_completion_tokens.')] = 'Optional. Example: 600. Some models use max_completion_tokens instead.';
+$_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Top P')] = 'Top P';
+$_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Optional. Werte zwischen 0 und 1.')] = 'Optional. Values between 0 and 1.';
+$_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Reasoning Effort')] = 'Reasoning effort';
+$_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Optional. Beispiel: low, medium oder high.')] = 'Optional. Example: low, medium or high.';
+$_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Zusätzliche Parameter')] = 'Additional parameters';
+$_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Optionales JSON-Objekt für zusätzliche Modellparameter, z. B. {"max_completion_tokens": 800, "reasoning": {"effort": "medium"}}.')] = 'Optional JSON object for additional model parameters, e.g. {"max_completion_tokens": 800, "reasoning": {"effort": "medium"}}.';
+$_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Die zusätzlichen Parameter müssen als gültiges JSON-Objekt angegeben werden.')] = 'Additional parameters must be provided as a valid JSON object.';
 $_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('System-Prompt')] = 'System prompt';
 $_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Definiert Rolle, Stil und Verhalten des Modells.')] = 'Defines the model\'s role, style and behavior.';
 $_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Prompt-Vorlage')] = 'Prompt template';
