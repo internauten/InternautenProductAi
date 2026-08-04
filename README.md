@@ -14,6 +14,7 @@ Dieses PrestaShop-Modul ergänzt im Produkt-Admin einen Button, mit dem anhand d
 - Batch-Generierung für mehrere ausgewählte Produkte in der Modul-Konfiguration
 - Serverseitige Produktsuche (Name, Referenz, Produkt-ID) für große Kataloge
 - OpenAI API Key, Modell und Prompt im Modul konfigurierbar
+- Konfigurierbare Modellparameter wie Temperatur, Max Tokens, Top P, Reasoning Effort und zusätzliche JSON-Parameter
 - HTML-Ausgabe für die direkte Nutzung in PrestaShop
 
 ## Installation
@@ -40,6 +41,7 @@ Hinweis: Die Batch-Verarbeitung arbeitet in der aktuell im Backoffice ausgewähl
 
 - Standardmodell: `gpt-4o-mini`
 - Der Prompt kann im Modul angepasst werden.
+- Für neuere Modelle können zusätzliche Parameter im Modul konfiguriert werden, z. B. `max_completion_tokens` oder `reasoning.effort`.
 - Bestehender Beschreibungstext wird bei der Generierung ersetzt.
 - Der erste Absatz der generierten Beschreibung wird zusätzlich in die Kurzbeschreibung übernommen.
 

@@ -7,6 +7,7 @@ class InternautenProductAi extends Module
 {
     const CONFIG_API_KEY = 'IPA_OPENAI_API_KEY';
     const CONFIG_MODEL = 'IPA_OPENAI_MODEL';
+    const CONFIG_MODEL_LIST = 'IPA_OPENAI_MODEL_LIST';
     const CONFIG_TEMPERATURE = 'IPA_OPENAI_TEMPERATURE';
     const CONFIG_MAX_TOKENS = 'IPA_OPENAI_MAX_TOKENS';
     const CONFIG_TOP_P = 'IPA_OPENAI_TOP_P';
@@ -19,7 +20,7 @@ class InternautenProductAi extends Module
     {
         $this->name = 'internautenproductai';
         $this->tab = 'administration';
-        $this->version = '1.3.0';
+        $this->version = '1.3.2';
         $this->author = 'die.internauten.ch GmbH';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -40,6 +41,7 @@ class InternautenProductAi extends Module
             && $this->installTab()
             && $this->registerHook('displayBackOfficeHeader')
             && Configuration::updateValue(self::CONFIG_MODEL, 'gpt-4o-mini')
+            && Configuration::updateValue(self::CONFIG_MODEL_LIST, '')
             && Configuration::updateValue(self::CONFIG_TEMPERATURE, '0.7')
             && Configuration::updateValue(self::CONFIG_MAX_TOKENS, '')
             && Configuration::updateValue(self::CONFIG_TOP_P, '')
@@ -53,6 +55,7 @@ class InternautenProductAi extends Module
     {
         return Configuration::deleteByName(self::CONFIG_API_KEY)
             && Configuration::deleteByName(self::CONFIG_MODEL)
+            && Configuration::deleteByName(self::CONFIG_MODEL_LIST)
             && Configuration::deleteByName(self::CONFIG_TEMPERATURE)
             && Configuration::deleteByName(self::CONFIG_MAX_TOKENS)
             && Configuration::deleteByName(self::CONFIG_TOP_P)
@@ -130,6 +133,7 @@ class InternautenProductAi extends Module
                 $output .= $this->displayError($this->l('Die zusätzlichen Parameter müssen als gültiges JSON-Objekt angegeben werden.'));
             } else {
                 Configuration::updateValue(self::CONFIG_API_KEY, $apiKey);
+                $this->refreshModelCache($apiKey);
                 Configuration::updateValue(self::CONFIG_MODEL, $model);
                 Configuration::updateValue(self::CONFIG_TEMPERATURE, $temperature);
                 Configuration::updateValue(self::CONFIG_MAX_TOKENS, $maxTokens);
@@ -282,6 +286,8 @@ class InternautenProductAi extends Module
         $helper->token = Tools::getAdminTokenLite('AdminModules');
         $helper->default_form_language = (int) $this->context->language->id;
         $helper->allow_employee_form_lang = (int) $this->context->language->id;
+        $this->refreshModelCache(Configuration::get(self::CONFIG_API_KEY));
+
         $helper->fields_value = array(
             self::CONFIG_API_KEY => Configuration::get(self::CONFIG_API_KEY),
             self::CONFIG_MODEL => Configuration::get(self::CONFIG_MODEL) ?: 'gpt-4o-mini',
@@ -293,6 +299,30 @@ class InternautenProductAi extends Module
             self::CONFIG_SYSTEM_PROMPT => Configuration::get(self::CONFIG_SYSTEM_PROMPT) ?: $this->getDefaultSystemPrompt(),
             self::CONFIG_PROMPT_TEMPLATE => Configuration::get(self::CONFIG_PROMPT_TEMPLATE) ?: $this->getDefaultPromptTemplate(),
         );
+
+        $modelField = array(
+            'type' => 'text',
+            'label' => $this->l('Modell'),
+            'name' => self::CONFIG_MODEL,
+            'required' => true,
+            'desc' => $this->l('Empfohlen: gpt-4o-mini'),
+        );
+
+        $availableModels = $this->getCachedAvailableModels();
+        if (!empty($availableModels)) {
+            $modelField = array(
+                'type' => 'select',
+                'label' => $this->l('Modell'),
+                'name' => self::CONFIG_MODEL,
+                'required' => true,
+                'desc' => $this->l('Verfügbare Modelle werden automatisch von OpenAI geladen.'),
+                'options' => array(
+                    'query' => $availableModels,
+                    'id' => 'id',
+                    'name' => 'name',
+                ),
+            );
+        }
 
         $fieldsForm = array(
             'form' => array(
@@ -308,19 +338,13 @@ class InternautenProductAi extends Module
                         'required' => false,
                         'desc' => $this->l('Trage hier deinen OpenAI API Key ein.'),
                     ),
-                    array(
-                        'type' => 'text',
-                        'label' => $this->l('Modell'),
-                        'name' => self::CONFIG_MODEL,
-                        'required' => true,
-                        'desc' => $this->l('Empfohlen: gpt-4o-mini'),
-                    ),
+                    $modelField,
                     array(
                         'type' => 'text',
                         'label' => $this->l('Temperatur'),
                         'name' => self::CONFIG_TEMPERATURE,
                         'required' => false,
-                        'desc' => $this->l('Optional. Standardwert: 0.7. Für neuere Modelle kann der Wert leer gelassen werden.'),
+                        'desc' => $this->l('Optional. Für klassische Modelle ist 0.7 ein sinnvoller Standard. Für GPT-5 oder o-Modelle lieber leer lassen, damit der API-Default verwendet wird.'),
                     ),
                     array(
                         'type' => 'text',
@@ -377,7 +401,22 @@ class InternautenProductAi extends Module
             ),
         );
 
-        return $helper->generateForm(array($fieldsForm));
+        $formHtml = $helper->generateForm(array($fieldsForm));
+
+        $formHtml .= '<script type="text/javascript">(function(){'
+            . 'var modelField=document.querySelector("input[name=\"' . self::CONFIG_MODEL . '\"], select[name=\"' . self::CONFIG_MODEL . '\"]");'
+            . 'if(!modelField){return;}'
+            . 'function findRow(name){var field=document.querySelector("input[name=\""+name+"\"], textarea[name=\""+name+"\"], select[name=\""+name+"\"]");if(!field){return null;}var row=field.closest(".form-group");if(row){return row;}var parent=field.parentElement;while(parent&&parent.tagName!=="FORM"){if(parent.classList&&parent.classList.contains("form-group")){return parent;}parent=parent.parentElement;}return null;}'
+            . 'function setRowVisible(name,visible){var row=findRow(name);if(row){row.style.display=visible?"":"none";}}'
+            . 'function getField(name){return document.querySelector("input[name=\""+name+"\"], textarea[name=\""+name+"\"], select[name=\""+name+"\"]");}'
+            . 'function fillDefaults(model){var isReasoningModel=model.indexOf("gpt-5")!==-1||model.indexOf("gpt-4.1")!==-1||model.indexOf("o1")!==-1||model.indexOf("o3")!==-1||model.indexOf("o4")!==-1;var supportsTopP=model.indexOf("gpt-5")===-1&&model.indexOf("o1")===-1&&model.indexOf("o3")===-1&&model.indexOf("o4")===-1;var usesCompletionTokens=model.indexOf("gpt-5")!==-1||model.indexOf("gpt-4.1")!==-1||model.indexOf("gpt-4o")!==-1||model.indexOf("o1")!==-1||model.indexOf("o3")!==-1||model.indexOf("o4")!==-1;setRowVisible("' . self::CONFIG_REASONING_EFFORT . '",isReasoningModel);setRowVisible("' . self::CONFIG_TOP_P . '",supportsTopP&&!isReasoningModel);var tempField=getField("' . self::CONFIG_TEMPERATURE . '");if(tempField){if(isReasoningModel){tempField.value="";}else if(!tempField.value){tempField.value="0.7";}}var maxField=getField("' . self::CONFIG_MAX_TOKENS . '");if(maxField&&(!maxField.value||maxField.value==="600"||maxField.value==="0")){maxField.value=usesCompletionTokens?"800":"600";}var reasoningField=getField("' . self::CONFIG_REASONING_EFFORT . '");if(reasoningField&&(!reasoningField.value||reasoningField.value==="")){reasoningField.value=isReasoningModel?"medium":"";}var topPField=getField("' . self::CONFIG_TOP_P . '");if(topPField&&(!topPField.value||topPField.value==="")){topPField.value=supportsTopP&&!isReasoningModel?"0.9":"";}var maxRow=findRow("' . self::CONFIG_MAX_TOKENS . '");if(maxRow){var help=maxRow.querySelector(".help-block, .form-control-comment");if(help){help.textContent=usesCompletionTokens?"Optional. Beispiel: 800. Für dieses Modell wird typischerweise max_completion_tokens verwendet.":"Optional. Beispiel: 600. Manche Modelle nutzen stattdessen max_completion_tokens.";}}}'
+            . 'function updateParameterFields(){var model=(modelField.value||"").toLowerCase();fillDefaults(model);}'
+            . 'modelField.addEventListener("change",updateParameterFields);'
+            . 'modelField.addEventListener("input",updateParameterFields);'
+            . 'updateParameterFields();'
+        . '})();</script>';
+
+        return $formHtml;
     }
 
     public function hookDisplayBackOfficeHeader()
@@ -429,11 +468,146 @@ class InternautenProductAi extends Module
         return hash_hmac('sha256', 'internautenproductai_ajax', _COOKIE_KEY_);
     }
 
+    public function translateText($text, $targetLanguage = 'English')
+    {
+        $text = trim((string) $text);
+        if ($text === '') {
+            return '';
+        }
+
+        $apiKey = trim((string) Configuration::get(self::CONFIG_API_KEY));
+        $model = trim((string) (Configuration::get(self::CONFIG_MODEL) ?: 'gpt-4o-mini'));
+        $temperature = trim((string) Configuration::get(self::CONFIG_TEMPERATURE));
+        if ($temperature === '') {
+            $temperature = $this->supportsTemperature($model) ? '0.7' : '';
+        }
+        $maxTokens = trim((string) Configuration::get(self::CONFIG_MAX_TOKENS));
+        $topP = trim((string) Configuration::get(self::CONFIG_TOP_P));
+        $reasoningEffort = trim((string) Configuration::get(self::CONFIG_REASONING_EFFORT));
+        $extraParameters = trim((string) Configuration::get(self::CONFIG_EXTRA_PARAMETERS));
+
+        if ($apiKey === '') {
+            throw new Exception($this->l('Es ist kein OpenAI API Key hinterlegt.'));
+        }
+
+        if ($model === '') {
+            $model = 'gpt-4o-mini';
+        }
+
+        if (!function_exists('curl_init')) {
+            throw new Exception($this->l('Die PHP-cURL-Erweiterung ist auf dem Server nicht aktiviert.'));
+        }
+
+        $translatedLanguage = trim((string) $targetLanguage);
+        if ($translatedLanguage === '') {
+            $translatedLanguage = 'English';
+        }
+
+        $payload = array(
+            'model' => $model,
+            'messages' => array(
+                array(
+                    'role' => 'system',
+                    'content' => 'You are a professional e-commerce translator. Translate the provided text to ' . $translatedLanguage . '. Preserve HTML markup, meaning and tone. Return only the translated text without markdown or explanations.',
+                ),
+                array(
+                    'role' => 'user',
+                    'content' => $text,
+                ),
+            ),
+        );
+
+        if ($this->supportsTemperature($model) && $temperature !== '' && is_numeric($temperature)) {
+            $payload['temperature'] = (float) $temperature;
+        }
+
+        if ($maxTokens !== '' && is_numeric($maxTokens)) {
+            if ($this->usesMaxCompletionTokens($model)) {
+                $payload['max_completion_tokens'] = (int) $maxTokens;
+            } else {
+                $payload['max_tokens'] = (int) $maxTokens;
+            }
+        }
+
+        if ($this->supportsTopP($model) && $topP !== '' && is_numeric($topP)) {
+            $payload['top_p'] = (float) $topP;
+        }
+
+        if ($reasoningEffort !== '') {
+            $payload['reasoning_effort'] = $reasoningEffort;
+        }
+
+        if ($extraParameters !== '') {
+            $payload = array_replace($payload, $this->parseExtraParameters($extraParameters));
+        }
+
+        $attempt = 0;
+        $currentPayload = $payload;
+
+        while (true) {
+            $attempt++;
+            $curl = curl_init('https://api.openai.com/v1/chat/completions');
+
+            curl_setopt_array($curl, array(
+                CURLOPT_POST => true,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 60,
+                CURLOPT_HTTPHEADER => array(
+                    'Content-Type: application/json',
+                    'Authorization: Bearer ' . $apiKey,
+                ),
+                CURLOPT_POSTFIELDS => json_encode($currentPayload),
+            ));
+
+            $response = curl_exec($curl);
+            $statusCode = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
+            $curlError = curl_error($curl);
+            curl_close($curl);
+
+            if ($response === false || $curlError) {
+                throw new Exception($this->l('OpenAI konnte nicht erreicht werden: ') . $curlError);
+            }
+
+            $data = json_decode($response, true);
+
+            if ($statusCode < 400) {
+                break;
+            }
+
+            $message = isset($data['error']['message']) ? $data['error']['message'] : $this->l('Unbekannter API-Fehler.');
+            $unsupportedParameters = $this->extractUnsupportedParameters($message);
+
+            if ($unsupportedParameters === array() || $attempt >= 3) {
+                throw new Exception($message);
+            }
+
+            $currentPayload = $this->removeUnsupportedParameters($currentPayload, $unsupportedParameters);
+        }
+
+        $content = '';
+        if (isset($data['choices'][0]['message']['content'])) {
+            $content = trim((string) $data['choices'][0]['message']['content']);
+        }
+
+        if ($content === '') {
+            throw new Exception($this->l('OpenAI hat keine Übersetzung zurückgegeben.'));
+        }
+
+        if (preg_match('/```(?:html)?\s*(.*?)```/is', $content, $matches)) {
+            $content = trim($matches[1]);
+        }
+
+        return $content;
+    }
+
     public function generateProductDescription($productName)
     {
         $apiKey = trim((string) Configuration::get(self::CONFIG_API_KEY));
         $model = trim((string) (Configuration::get(self::CONFIG_MODEL) ?: 'gpt-4o-mini'));
-        $temperature = trim((string) (Configuration::get(self::CONFIG_TEMPERATURE) ?: '0.7'));
+        $temperature = trim((string) Configuration::get(self::CONFIG_TEMPERATURE));
+        if ($temperature === '') {
+            $temperature = $this->supportsTemperature($model) ? '0.7' : '';
+        }
         $maxTokens = trim((string) Configuration::get(self::CONFIG_MAX_TOKENS));
         $topP = trim((string) Configuration::get(self::CONFIG_TOP_P));
         $reasoningEffort = trim((string) Configuration::get(self::CONFIG_REASONING_EFFORT));
@@ -477,15 +651,19 @@ class InternautenProductAi extends Module
             ),
         );
 
-        if ($temperature !== '' && is_numeric($temperature)) {
+        if ($this->supportsTemperature($model) && $temperature !== '' && is_numeric($temperature)) {
             $payload['temperature'] = (float) $temperature;
         }
 
         if ($maxTokens !== '' && is_numeric($maxTokens)) {
-            $payload['max_tokens'] = (int) $maxTokens;
+            if ($this->usesMaxCompletionTokens($model)) {
+                $payload['max_completion_tokens'] = (int) $maxTokens;
+            } else {
+                $payload['max_tokens'] = (int) $maxTokens;
+            }
         }
 
-        if ($topP !== '' && is_numeric($topP)) {
+        if ($this->supportsTopP($model) && $topP !== '' && is_numeric($topP)) {
             $payload['top_p'] = (float) $topP;
         }
 
@@ -497,33 +675,49 @@ class InternautenProductAi extends Module
             $payload = array_replace($payload, $this->parseExtraParameters($extraParameters));
         }
 
-        $curl = curl_init('https://api.openai.com/v1/chat/completions');
+        $attempt = 0;
+        $lastMessage = '';
+        $currentPayload = $payload;
 
-        curl_setopt_array($curl, array(
-            CURLOPT_POST => true,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 60,
-            CURLOPT_HTTPHEADER => array(
-                'Content-Type: application/json',
-                'Authorization: Bearer ' . $apiKey,
-            ),
-            CURLOPT_POSTFIELDS => json_encode($payload),
-        ));
+        while (true) {
+            $attempt++;
+            $curl = curl_init('https://api.openai.com/v1/chat/completions');
 
-        $response = curl_exec($curl);
-        $statusCode = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
-        $curlError = curl_error($curl);
-        curl_close($curl);
+            curl_setopt_array($curl, array(
+                CURLOPT_POST => true,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 60,
+                CURLOPT_HTTPHEADER => array(
+                    'Content-Type: application/json',
+                    'Authorization: Bearer ' . $apiKey,
+                ),
+                CURLOPT_POSTFIELDS => json_encode($currentPayload),
+            ));
 
-        if ($response === false || $curlError) {
-            throw new Exception($this->l('OpenAI konnte nicht erreicht werden: ') . $curlError);
-        }
+            $response = curl_exec($curl);
+            $statusCode = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
+            $curlError = curl_error($curl);
+            curl_close($curl);
 
-        $data = json_decode($response, true);
+            if ($response === false || $curlError) {
+                throw new Exception($this->l('OpenAI konnte nicht erreicht werden: ') . $curlError);
+            }
 
-        if ($statusCode >= 400) {
+            $data = json_decode($response, true);
+
+            if ($statusCode < 400) {
+                break;
+            }
+
             $message = isset($data['error']['message']) ? $data['error']['message'] : $this->l('Unbekannter API-Fehler.');
-            throw new Exception($message);
+            $unsupportedParameters = $this->extractUnsupportedParameters($message);
+
+            if ($unsupportedParameters === array() || $attempt >= 3) {
+                throw new Exception($message);
+            }
+
+            $currentPayload = $this->removeUnsupportedParameters($currentPayload, $unsupportedParameters);
+            $lastMessage = $message;
         }
 
         $content = '';
@@ -540,6 +734,146 @@ class InternautenProductAi extends Module
         }
 
         return $content;
+    }
+
+    protected function refreshModelCache($apiKey)
+    {
+        if (trim((string) $apiKey) === '') {
+            return array();
+        }
+
+        $models = $this->fetchAvailableModels($apiKey);
+        Configuration::updateValue(self::CONFIG_MODEL_LIST, json_encode($models));
+
+        return $models;
+    }
+
+    protected function fetchAvailableModels($apiKey)
+    {
+        $models = array();
+        $apiKey = trim((string) $apiKey);
+        if ($apiKey === '') {
+            return $models;
+        }
+
+        $curl = curl_init('https://api.openai.com/v1/models');
+        curl_setopt_array($curl, array(
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 20,
+            CURLOPT_HTTPHEADER => array(
+                'Authorization: Bearer ' . $apiKey,
+            ),
+        ));
+
+        $response = curl_exec($curl);
+        $statusCode = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        curl_close($curl);
+
+        if ($response === false || $statusCode >= 400) {
+            return $models;
+        }
+
+        $data = json_decode($response, true);
+        if (!isset($data['data']) || !is_array($data['data'])) {
+            return $models;
+        }
+
+        foreach ($data['data'] as $modelData) {
+            if (!isset($modelData['id']) || !is_string($modelData['id'])) {
+                continue;
+            }
+
+            $id = $modelData['id'];
+            $models[] = array(
+                'id' => $id,
+                'name' => $id,
+            );
+        }
+
+        usort($models, function ($left, $right) {
+            return strcmp($left['id'], $right['id']);
+        });
+
+        return $models;
+    }
+
+    protected function getCachedAvailableModels()
+    {
+        $raw = trim((string) Configuration::get(self::CONFIG_MODEL_LIST));
+        if ($raw === '') {
+            return array();
+        }
+
+        $decoded = json_decode($raw, true);
+        if (!is_array($decoded)) {
+            return array();
+        }
+
+        return $decoded;
+    }
+
+    protected function supportsTemperature($model)
+    {
+        $normalized = strtolower((string) $model);
+
+        return strpos($normalized, 'gpt-5') === false
+            && strpos($normalized, 'o1') === false
+            && strpos($normalized, 'o3') === false
+            && strpos($normalized, 'o4') === false;
+    }
+
+    protected function supportsTopP($model)
+    {
+        $normalized = strtolower((string) $model);
+
+        return strpos($normalized, 'gpt-5') === false
+            && strpos($normalized, 'o1') === false
+            && strpos($normalized, 'o3') === false
+            && strpos($normalized, 'o4') === false;
+    }
+
+    protected function usesMaxCompletionTokens($model)
+    {
+        $normalized = strtolower((string) $model);
+
+        return strpos($normalized, 'gpt-5') !== false || strpos($normalized, 'o1') !== false || strpos($normalized, 'o3') !== false || strpos($normalized, 'o4') !== false || strpos($normalized, 'gpt-4.1') !== false || strpos($normalized, 'gpt-4o') !== false;
+    }
+
+    protected function extractUnsupportedParameters($message)
+    {
+        $message = strtolower((string) $message);
+        $unsupported = array();
+        $supportedParameters = array(
+            'temperature',
+            'top_p',
+            'reasoning_effort',
+            'max_tokens',
+            'max_completion_tokens',
+        );
+
+        if (strpos($message, 'unsupported parameter') === false
+            && strpos($message, 'unsupported value') === false
+            && strpos($message, 'does not support') === false
+            && strpos($message, 'not supported') === false) {
+            return $unsupported;
+        }
+
+        foreach ($supportedParameters as $parameter) {
+            if (strpos($message, $parameter) !== false) {
+                $unsupported[] = $parameter;
+            }
+        }
+
+        return $unsupported;
+    }
+
+    protected function removeUnsupportedParameters($payload, $unsupportedParameters)
+    {
+        foreach ($unsupportedParameters as $parameter) {
+            unset($payload[$parameter]);
+        }
+
+        return $payload;
     }
 
     protected function isValidJsonObject($value)

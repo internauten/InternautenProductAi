@@ -43,10 +43,12 @@
 
         if (langId) {
             selectors.push('#form_step1_description_short_' + langId);
+            selectors.push('#description_short_' + langId);
         }
 
         selectors = selectors.concat([
             'textarea[id^="form_step1_description_short_"]',
+            'textarea[id^="description_short_"]',
             'textarea[name*="[description_short]"]'
         ]);
 
@@ -58,6 +60,87 @@
         }
 
         return null;
+    }
+
+    function findAllDescriptionFields() {
+        var fields = [];
+        var selectors = [
+            'textarea[id^="form_step1_description_"]',
+            'textarea[id^="description_"]',
+            'textarea[name*="[description]"]',
+            'textarea.js-locale-input'
+        ];
+
+        document.querySelectorAll(selectors.join(',')).forEach(function (field) {
+            if (isDetailedDescriptionField(field) && fields.indexOf(field) === -1) {
+                fields.push(field);
+            }
+        });
+
+        return fields;
+    }
+
+    function findAllShortDescriptionFields() {
+        var fields = [];
+        var selectors = [
+            'textarea[id^="form_step1_description_short_"]',
+            'textarea[id^="description_short_"]',
+            'textarea[name*="[description_short]"]'
+        ];
+
+        document.querySelectorAll(selectors.join(',')).forEach(function (field) {
+            if (isShortDescriptionField(field) && fields.indexOf(field) === -1) {
+                fields.push(field);
+            }
+        });
+
+        return fields;
+    }
+
+    function isShortDescriptionField(field) {
+        if (!field) {
+            return false;
+        }
+
+        var id = (field.id || '').toLowerCase();
+        var name = (field.name || '').toLowerCase();
+
+        return id.indexOf('description_short') !== -1 || name.indexOf('[description_short]') !== -1;
+    }
+
+    function isDetailedDescriptionField(field) {
+        if (!field || isShortDescriptionField(field)) {
+            return false;
+        }
+
+        var id = (field.id || '').toLowerCase();
+        var name = (field.name || '').toLowerCase();
+
+        return id.indexOf('form_step1_description_') !== -1
+            || id.indexOf('description_') !== -1
+            || name.indexOf('[description]') !== -1
+            || (field.classList && field.classList.contains('js-locale-input'));
+    }
+
+    function getFieldLanguageId(field) {
+        if (!field) {
+            return '';
+        }
+
+        var id = field.id || '';
+        var name = field.name || '';
+        var match = id.match(/_(\d+)$/);
+
+        if (match) {
+            return match[1];
+        }
+
+        match = name.match(/\[(\d+)\]/);
+        if (match) {
+            return match[1];
+        }
+
+        return '';
     }
 
     function extractFirstParagraphHtml(content) {
@@ -181,6 +264,69 @@
                 if (shortDescriptionField && firstParagraph) {
                     updateEditor(shortDescriptionField, firstParagraph);
                 }
+
+                if (langId && generatedDescription) {
+                    var translateBody = new URLSearchParams();
+                    translateBody.append('source_text', generatedDescription);
+                    translateBody.append('translate_to', 'English');
+
+                    return fetch(config.ajaxUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        credentials: 'same-origin',
+                        body: translateBody.toString()
+                    })
+                        .then(function (response) {
+                            return response.text().then(function (text) {
+                                var translationData = null;
+
+                                try {
+                                    translationData = JSON.parse(text);
+                                } catch (error) {
+                                    return null;
+                                }
+
+                                if (!translationData || !translationData.success) {
+                                    return null;
+                                }
+
+                                return translationData;
+                            });
+                        })
+                        .then(function (translationData) {
+                            var translatedDescription = translationData && translationData.description ? translationData.description : generatedDescription;
+                            var translatedShortDescription = extractFirstParagraphHtml(translatedDescription);
+
+                            findAllDescriptionFields().forEach(function (field) {
+                                if (field === textarea) {
+                                    return;
+                                }
+
+                                var fieldLangId = getFieldLanguageId(field);
+                                if (fieldLangId && langId && fieldLangId === langId) {
+                                    return;
+                                }
+
+                                updateEditor(field, translatedDescription);
+                            });
+
+                            findAllShortDescriptionFields().forEach(function (field) {
+                                if (field === shortDescriptionField) {
+                                    return;
+                                }
+
+                                var fieldLangId = getFieldLanguageId(field);
+                                if (fieldLangId && langId && fieldLangId === langId) {
+                                    return;
+                                }
+
+                                updateEditor(field, translatedShortDescription);
+                            });
+                        });
+                }
             })
             .catch(function (error) {
                 window.alert(error.message || config.genericError || config.generationError);
@@ -192,7 +338,7 @@
     }
 
     function insertButton(textarea) {
-        if (!textarea || textarea.dataset.internautenAiBound === '1') {
+        if (!textarea || textarea.dataset.internautenAiBound === '1' || !isDetailedDescriptionField(textarea)) {
             return;
         }
 
@@ -217,6 +363,7 @@
     function scanEditors() {
         var selectors = [
             'textarea[id^="form_step1_description_"]',
+            'textarea[id^="description_"]',
             'textarea[name*="[description]"]',
             'textarea.js-locale-input'
         ];

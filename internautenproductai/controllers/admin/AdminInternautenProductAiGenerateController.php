@@ -84,16 +84,26 @@ class AdminInternautenProductAiGenerateController extends ModuleAdminController
             }
 
             $productName = trim((string) Tools::getValue('product_name'));
-            if ($productName === '') {
-                throw new Exception($this->translate('Der Produktname fehlt.'));
+            $sourceText = trim((string) Tools::getValue('source_text'));
+            $translateTo = trim((string) Tools::getValue('translate_to'));
+
+            if ($sourceText !== '') {
+                $description = $this->module->translateText($sourceText, $translateTo !== '' ? $translateTo : 'English');
+            } else {
+                if ($productName === '') {
+                    throw new Exception($this->translate('Der Produktname fehlt.'));
+                }
+
+                $description = $this->module->generateProductDescription($productName);
             }
 
-            $description = $this->module->generateProductDescription($productName);
             restore_error_handler();
 
             $this->jsonResponse(array(
                 'success' => true,
                 'description' => $description,
+                'translated' => $sourceText !== '',
+                'target_language' => $translateTo !== '' ? $translateTo : 'English',
             ));
         } catch (Throwable $exception) {
             restore_error_handler();
