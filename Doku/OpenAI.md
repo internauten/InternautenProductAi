@@ -47,7 +47,7 @@ Stil:
 - keine Hinweise auf KI
 - keine Emojis
 - keine Markdown-Codebloecke
-- Schweizer Doppel-S verwenden, kein &szlig;
+- Schweizer Doppel-S verwenden, kein &
 - Umlaute und Sonderzeichen HTML-codieren
 
 ## Zusatzfelder wenn vorhanden

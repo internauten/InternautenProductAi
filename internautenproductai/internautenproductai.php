@@ -20,7 +20,7 @@ class InternautenProductAi extends Module
     {
         $this->name = 'internautenproductai';
         $this->tab = 'administration';
-        $this->version = '2.4.0';
+        $this->version = '2.6.0';
         $this->author = 'die.internauten.ch GmbH';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -218,6 +218,9 @@ class InternautenProductAi extends Module
         $html .= '<div class="form-group">';
         $html .= '<label for="internauten-ai-bulk-search">' . htmlspecialchars($this->l('Produkte filtern'), ENT_QUOTES, 'UTF-8') . '</label>';
         $html .= '<input type="text" id="internauten-ai-bulk-search" class="form-control" placeholder="' . htmlspecialchars($this->l('Suche nach ID, Name oder Referenz...'), ENT_QUOTES, 'UTF-8') . '" style="margin-bottom:8px;">';
+        $html .= '<label for="internauten-ai-bulk-min-length">' . htmlspecialchars($this->l('Mindestlänge der Kurzbeschreibung (Zeichen)'), ENT_QUOTES, 'UTF-8') . '</label>';
+        $html .= '<input type="number" min="0" step="1" value="20" id="internauten-ai-bulk-min-length" class="form-control" style="margin-bottom:4px;">';
+        $html .= '<p class="help-block">' . htmlspecialchars($this->l('Es werden nur Produkte gelistet, deren Kurzbeschreibung kürzer als dieser Wert ist. Bei 20 gilt eine Beschreibung ab 20 Zeichen als vorhanden.'), ENT_QUOTES, 'UTF-8') . '</p>';
         $html .= '<label for="internauten-ai-bulk-category-filter">' . htmlspecialchars($this->l('Hauptkategorie'), ENT_QUOTES, 'UTF-8') . '</label>';
         $html .= '<select id="internauten-ai-bulk-category-filter" class="form-control" style="margin-bottom:8px;">';
         $html .= '<option value="">' . htmlspecialchars($this->l('Alle Kategorien'), ENT_QUOTES, 'UTF-8') . '</option>';
@@ -269,6 +272,7 @@ class InternautenProductAi extends Module
         $html .= '<script>(function(){'
             . 'var cfg=' . json_encode($scriptConfig, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . ';'
             . 'var search=document.getElementById("internauten-ai-bulk-search");'
+            . 'var minLengthFilter=document.getElementById("internauten-ai-bulk-min-length");'
             . 'var categoryFilter=document.getElementById("internauten-ai-bulk-category-filter");'
             . 'var select=document.getElementById("internauten-ai-bulk-products");'
             . 'var selectVisible=document.getElementById("internauten-ai-bulk-select-visible");'
@@ -289,9 +293,10 @@ class InternautenProductAi extends Module
             . 'function updateSelectedCount(){selectedCount.textContent=cfg.texts.selectedCount.replace("%d",String(Object.keys(selectedIds).length));}'
             . 'function renderOptions(products){select.innerHTML="";if(!products.length){var emptyOpt=document.createElement("option");emptyOpt.value="";emptyOpt.disabled=true;emptyOpt.textContent=cfg.texts.noProductsFound;select.appendChild(emptyOpt);return;}products.forEach(function(item){var option=document.createElement("option");var id=String(item.id_product||"");option.value=id;option.textContent=item.label||("#"+id+" - "+(item.name||""));if(selectedIds[id]){option.selected=true;}select.appendChild(option);});}'
             . 'function syncCurrentSelections(){Array.prototype.forEach.call(select.options,function(opt){if(!opt.value){return;}if(opt.selected){selectedIds[opt.value]=true;}else{delete selectedIds[opt.value];}});updateSelectedCount();}'
-            . 'function fetchProducts(query){var body=new URLSearchParams();body.append("id_lang",String(cfg.idLang));body.append("query",query||"");if(categoryFilter){body.append("category_id",categoryFilter.value||"");}return fetch(cfg.searchAjaxUrl,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded; charset=UTF-8","X-Requested-With":"XMLHttpRequest"},credentials:"same-origin",body:body.toString()}).then(parseJsonResponse).then(function(data){return data.products||[];});}'
+            . 'function fetchProducts(query){var body=new URLSearchParams();body.append("id_lang",String(cfg.idLang));body.append("query",query||"");if(categoryFilter){body.append("category_id",categoryFilter.value||"");}if(minLengthFilter){body.append("min_length",minLengthFilter.value||"");}return fetch(cfg.searchAjaxUrl,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded; charset=UTF-8","X-Requested-With":"XMLHttpRequest"},credentials:"same-origin",body:body.toString()}).then(parseJsonResponse).then(function(data){return data.products||[];});}'
             . 'function queueSearch(){if(searchTimer){clearTimeout(searchTimer);}searchTimer=setTimeout(function(){syncCurrentSelections();status.textContent=cfg.texts.searchLoading;fetchProducts((search.value||"").trim()).then(function(products){renderOptions(products);status.textContent="";}).catch(function(error){status.textContent=error.message||cfg.texts.genericError;renderOptions([]);});},250);}'
             . 'search.addEventListener("input",queueSearch);'
+            . 'if(minLengthFilter){minLengthFilter.addEventListener("input",queueSearch);}'
             . 'if(categoryFilter){categoryFilter.addEventListener("change",queueSearch);}'
             . 'select.addEventListener("change",syncCurrentSelections);'
             . 'selectVisible.addEventListener("click",function(){'
@@ -514,7 +519,7 @@ class InternautenProductAi extends Module
                         'rows' => 8,
                         'cols' => 80,
                         'autoload_rte' => false,
-                        'desc' => $this->l('Platzhalter: {{product_name}}, {{category}} (Standardkategorie), {{brand}} (Destillerie), {{region}} (Region), {{age}} (Alter), {{abv}} (VOL %), {{volume}} (Inhalt), {{vintage}} (Jahrgang). Nicht vorhandene Werte bleiben leer.'),
+                        'desc' => $this->l('Platzhalter: {{product_name}}, {{category}} (Standardkategorie), {{brand}} (Destillerie), {{region}} (Region), {{age}} (Alter), {{abv}} (VOL %), {{volume}} (Inhalt), {{vintage}} (Jahrgang), {{bottler}} (Abfüller). Nicht vorhandene Werte bleiben leer.'),
                     ),
                 ),
                 'submit' => array(
@@ -736,6 +741,7 @@ class InternautenProductAi extends Module
             'abv' => '',
             'volume' => '',
             'vintage' => '',
+            'bottler' => '',
         );
 
         $idProduct = (int) $idProduct;
@@ -785,6 +791,11 @@ class InternautenProductAi extends Module
     protected function matchFeaturePlaceholder($featureName)
     {
         $normalized = Tools::strtolower(trim((string) $featureName));
+        $normalized = str_replace(
+            array('ä', 'ö', 'ü', 'ß'),
+            array('ae', 'oe', 'ue', 'ss'),
+            $normalized
+        );
         $normalized = preg_replace('/[^a-z0-9]/', '', $normalized);
 
         if ($normalized === '') {
@@ -810,6 +821,9 @@ class InternautenProductAi extends Module
             'fuellmenge' => 'volume',
             'jahrgang' => 'vintage',
             'vintage' => 'vintage',
+            'abfueller' => 'bottler',
+            'abfuller' => 'bottler',
+            'bottler' => 'bottler',
         );
 
         return isset($map[$normalized]) ? $map[$normalized] : '';
@@ -1174,7 +1188,8 @@ class InternautenProductAi extends Module
             . "Alter: {{age}}\n"
             . "Alkoholgehalt: {{abv}}\n"
             . "Inhalt: {{volume}}\n"
-            . "Jahrgang: {{vintage}}\n\n"
+            . "Jahrgang: {{vintage}}\n"
+            . "Abfüller: {{bottler}}\n\n"
             . "Inhalt:\n"
             . "- beschreibe den Whisky mit einer eleganten, sensorischen und genussorientierten Sprache\n"
             . "- gehe, wenn aus dem Namen erkennbar, auf Herkunft, Fassreifung, Duft, Geschmack, Mundgefühl und Nachklang ein\n"

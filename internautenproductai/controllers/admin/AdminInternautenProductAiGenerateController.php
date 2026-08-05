@@ -324,6 +324,12 @@ class AdminInternautenProductAiGenerateController extends ModuleAdminController
             $queryText = trim((string) Tools::getValue('query'));
             $categoryId = (int) Tools::getValue('category_id');
 
+            $rawMinLength = Tools::getValue('min_length');
+            $minLength = ($rawMinLength === false || trim((string) $rawMinLength) === '') ? 20 : (int) $rawMinLength;
+            if ($minLength < 0) {
+                $minLength = 0;
+            }
+
             $query = new DbQuery();
             $query->select('p.id_product, pl.name, p.reference, pl.description_short');
             $query->from('product', 'p');
@@ -335,7 +341,9 @@ class AdminInternautenProductAiGenerateController extends ModuleAdminController
                 . ' AND pl.id_shop = ' . (int) $idShop
             );
             $query->where('p.active = 1');
-            $query->where('CHAR_LENGTH(TRIM(COALESCE(pl.description_short, ""))) < 20');
+            if ($minLength > 0) {
+                $query->where('CHAR_LENGTH(TRIM(COALESCE(pl.description_short, ""))) < ' . (int) $minLength);
+            }
 
             if ($categoryId > 0) {
                 $query->innerJoin(
