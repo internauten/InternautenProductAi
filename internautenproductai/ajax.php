@@ -97,7 +97,9 @@ try {
         throw new Exception(internautenTranslate('Das Modul konnte nicht geladen werden.'));
     }
 
-    $description = $module->generateProductDescription($productName);
+    $placeholders = $module->getProductPromptPlaceholders((int) Tools::getValue('id_product'));
+
+    $description = $module->generateProductDescription($productName, $placeholders);
     restore_error_handler();
 
     internautenJsonResponse(array(

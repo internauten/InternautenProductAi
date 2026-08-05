@@ -105,7 +105,12 @@ class AdminInternautenProductAiGenerateController extends ModuleAdminController
                     throw new Exception($this->translate('Der Produktname fehlt.'));
                 }
 
-                $description = $this->module->generateProductDescription($productName);
+                $placeholders = $this->module->getProductPromptPlaceholders(
+                    (int) Tools::getValue('id_product'),
+                    (int) $this->context->language->id
+                );
+
+                $description = $this->module->generateProductDescription($productName, $placeholders);
             }
 
             restore_error_handler();
@@ -174,7 +179,9 @@ class AdminInternautenProductAiGenerateController extends ModuleAdminController
                 throw new Exception($this->translate('Produkt nicht gefunden oder ohne Namen.'));
             }
 
-            $germanDescription = $this->module->generateProductDescription($productName);
+            $placeholders = $this->module->getProductPromptPlaceholders($idProduct, $nameLangId);
+
+            $germanDescription = $this->module->generateProductDescription($productName, $placeholders);
             $germanShortDescription = $this->extractFirstParagraphHtml($germanDescription);
 
             $englishDescription = $this->module->translateText($germanDescription, 'English');

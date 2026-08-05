@@ -20,7 +20,7 @@ class InternautenProductAi extends Module
     {
         $this->name = 'internautenproductai';
         $this->tab = 'administration';
-        $this->version = '2.2.2';
+        $this->version = '2.3.0';
         $this->author = 'die.internauten.ch GmbH';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -438,7 +438,7 @@ class InternautenProductAi extends Module
                         'rows' => 8,
                         'cols' => 80,
                         'autoload_rte' => false,
-                        'desc' => $this->l('Nutze {{product_name}} als Platzhalter für den Artikelnamen.'),
+                        'desc' => $this->l('Platzhalter: {{product_name}}, {{category}} (Standardkategorie), {{brand}} (Destillerie), {{region}} (Region), {{age}} (Alter), {{abv}} (VOL %), {{volume}} (Inhalt), {{vintage}} (Jahrgang). Nicht vorhandene Werte bleiben leer.'),
                     ),
                 ),
                 'submit' => array(
@@ -646,7 +646,112 @@ class InternautenProductAi extends Module
         return $content;
     }
 
-    public function generateProductDescription($productName)
+    /**
+     * Resolves the prompt placeholders that come from the product itself
+     * (default category plus the whisky related product features).
+     */
+    public function getProductPromptPlaceholders($idProduct, $idLang = null)
+    {
+        $placeholders = array(
+            'category' => '',
+            'brand' => '',
+            'region' => '',
+            'age' => '',
+            'abv' => '',
+            'volume' => '',
+            'vintage' => '',
+        );
+
+        $idProduct = (int) $idProduct;
+        if ($idProduct <= 0) {
+            return $placeholders;
+        }
+
+        $idLang = $idLang === null ? (int) $this->context->language->id : (int) $idLang;
+
+        $categoryRow = Db::getInstance()->getRow(
+            'SELECT cl.`name`'
+            . ' FROM `' . _DB_PREFIX_ . 'product` p'
+            . ' INNER JOIN `' . _DB_PREFIX_ . 'category_lang` cl'
+            . ' ON (cl.`id_category` = p.`id_category_default` AND cl.`id_lang` = ' . (int) $idLang . ')'
+            . ' WHERE p.`id_product` = ' . (int) $idProduct
+        );
+
+        if ($categoryRow && isset($categoryRow['name'])) {
+            $placeholders['category'] = trim((string) $categoryRow['name']);
+        }
+
+        $featureRows = Db::getInstance()->executeS(
+            'SELECT fl.`name` AS feature_name, fvl.`value` AS feature_value'
+            . ' FROM `' . _DB_PREFIX_ . 'feature_product` fp'
+            . ' INNER JOIN `' . _DB_PREFIX_ . 'feature_lang` fl'
+            . ' ON (fl.`id_feature` = fp.`id_feature` AND fl.`id_lang` = ' . (int) $idLang . ')'
+            . ' INNER JOIN `' . _DB_PREFIX_ . 'feature_value_lang` fvl'
+            . ' ON (fvl.`id_feature_value` = fp.`id_feature_value` AND fvl.`id_lang` = ' . (int) $idLang . ')'
+            . ' WHERE fp.`id_product` = ' . (int) $idProduct
+        );
+
+        foreach ((array) $featureRows as $featureRow) {
+            $key = $this->matchFeaturePlaceholder(isset($featureRow['feature_name']) ? $featureRow['feature_name'] : '');
+            if ($key === '' || !isset($placeholders[$key]) || $placeholders[$key] !== '') {
+                continue;
+            }
+
+            $value = trim((string) (isset($featureRow['feature_value']) ? $featureRow['feature_value'] : ''));
+            if ($value !== '') {
+                $placeholders[$key] = $value;
+            }
+        }
+
+        return $placeholders;
+    }
+
+    protected function matchFeaturePlaceholder($featureName)
+    {
+        $normalized = Tools::strtolower(trim((string) $featureName));
+        $normalized = preg_replace('/[^a-z0-9]/', '', $normalized);
+
+        if ($normalized === '') {
+            return '';
+        }
+
+        $map = array(
+            'destillerie' => 'brand',
+            'distillerie' => 'brand',
+            'distillery' => 'brand',
+            'marke' => 'brand',
+            'brand' => 'brand',
+            'region' => 'region',
+            'herkunft' => 'region',
+            'alter' => 'age',
+            'age' => 'age',
+            'vol' => 'abv',
+            'volprozent' => 'abv',
+            'alkoholgehalt' => 'abv',
+            'abv' => 'abv',
+            'inhalt' => 'volume',
+            'volumen' => 'volume',
+            'fuellmenge' => 'volume',
+            'jahrgang' => 'vintage',
+            'vintage' => 'vintage',
+        );
+
+        return isset($map[$normalized]) ? $map[$normalized] : '';
+    }
+
+    protected function applyPromptPlaceholders($template, $productName, array $placeholders = array())
+    {
+        $values = array_merge(array('product_name' => (string) $productName), $placeholders);
+
+        foreach ($values as $key => $value) {
+            $template = str_replace('{{' . $key . '}}', (string) $value, $template);
+        }
+
+        // Unknown or unresolved placeholders are left empty on purpose.
+        return preg_replace('/\{\{\s*[a-z0-9_]+\s*\}\}/i', '', $template);
+    }
+
+    public function generateProductDescription($productName, array $placeholders = array())
     {
         $apiKey = trim((string) Configuration::get(self::CONFIG_API_KEY));
         $model = trim((string) (Configuration::get(self::CONFIG_MODEL) ?: 'gpt-4o-mini'));
@@ -677,7 +782,7 @@ class InternautenProductAi extends Module
             $promptTemplate = $this->getDefaultPromptTemplate();
         }
 
-        $userPrompt = str_replace('{{product_name}}', $productName, $promptTemplate);
+        $userPrompt = $this->applyPromptPlaceholders($promptTemplate, $productName, $placeholders);
 
         if (!function_exists('curl_init')) {
             throw new Exception($this->l('Die PHP-cURL-Erweiterung ist auf dem Server nicht aktiviert.'));
@@ -965,6 +1070,14 @@ class InternautenProductAi extends Module
     protected function getDefaultPromptTemplate()
     {
         return "Erstelle für das Produkt \"{{product_name}}\" eine sommelier-artige Produktbeschreibung für einen deutschsprachigen Onlineshop mit Fokus auf Whisky und Premium-Spirituosen.\n\n"
+            . "Falls vorhanden, nutze diese Zusatzinformationen:\n"
+            . "Kategorie: {{category}}\n"
+            . "Marke/Destillerie: {{brand}}\n"
+            . "Herkunft/Region: {{region}}\n"
+            . "Alter: {{age}}\n"
+            . "Alkoholgehalt: {{abv}}\n"
+            . "Inhalt: {{volume}}\n"
+            . "Jahrgang: {{vintage}}\n\n"
             . "Inhalt:\n"
             . "- beschreibe den Whisky mit einer eleganten, sensorischen und genussorientierten Sprache\n"
             . "- gehe, wenn aus dem Namen erkennbar, auf Herkunft, Fassreifung, Duft, Geschmack, Mundgefühl und Nachklang ein\n"

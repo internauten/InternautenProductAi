@@ -25,7 +25,7 @@ $_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Die zu
 $_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('System-Prompt')] = 'Prompt système';
 $_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Definiert Rolle, Stil und Verhalten des Modells.')] = 'Définit le rôle, le style et le comportement du modèle.';
 $_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Prompt-Vorlage')] = 'Modèle de prompt';
-$_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Nutze {{product_name}} als Platzhalter für den Artikelnamen.')] = 'Utilisez {{product_name}} comme variable pour le nom du produit.';
+$_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Platzhalter: {{product_name}}, {{category}} (Standardkategorie), {{brand}} (Destillerie), {{region}} (Region), {{age}} (Alter), {{abv}} (VOL %), {{volume}} (Inhalt), {{vintage}} (Jahrgang). Nicht vorhandene Werte bleiben leer.')] = 'Variables : {{product_name}}, {{category}} (catégorie par défaut), {{brand}} (distillerie), {{region}} (région), {{age}} (âge), {{abv}} (degré d\'alcool), {{volume}} (contenance), {{vintage}} (millésime). Les valeurs absentes restent vides.';
 $_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Speichern')] = 'Enregistrer';
 $_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Mit ChatGPT generieren')] = 'Générer avec ChatGPT';
 $_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Beschreibung wird erstellt...')] = 'Génération de la description...';

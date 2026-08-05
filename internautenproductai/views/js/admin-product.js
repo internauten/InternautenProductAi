@@ -143,6 +143,17 @@
         return '';
     }
 
+    function findProductId() {
+        var input = document.querySelector('input[name="id_product"], #form_id_product');
+        if (input && input.value) {
+            return input.value.trim();
+        }
+
+        var match = window.location.search.match(/[?&]id_product=(\d+)/);
+
+        return match ? match[1] : '';
+    }
+
     function extractFirstParagraphHtml(content) {
         if (!content) {
             return '';
@@ -198,6 +209,11 @@
 
         var body = new URLSearchParams();
         body.append('product_name', productName);
+
+        var productId = findProductId();
+        if (productId) {
+            body.append('id_product', productId);
+        }
 
         var requestUrls = [config.ajaxUrl, config.fallbackAjaxUrl].filter(Boolean);
 
