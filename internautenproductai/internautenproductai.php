@@ -20,7 +20,7 @@ class InternautenProductAi extends Module
     {
         $this->name = 'internautenproductai';
         $this->tab = 'administration';
-        $this->version = '2.3.0';
+        $this->version = '2.4.0';
         $this->author = 'die.internauten.ch GmbH';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -174,6 +174,16 @@ class InternautenProductAi extends Module
             )
         );
 
+        $previewAjaxUrl = $this->context->link->getAdminLink(
+            'AdminInternautenProductAiGenerate',
+            true,
+            array(),
+            array(
+                'ajax' => 1,
+                'action' => 'PreviewPrompt',
+            )
+        );
+
         $texts = array(
             'selectRequired' => $this->l('Bitte wähle mindestens ein Produkt aus.'),
             'loading' => $this->l('Beschreibungen werden im Hintergrund generiert...'),
@@ -185,6 +195,12 @@ class InternautenProductAi extends Module
             'emptyResponseLabel' => $this->l('leere Antwort'),
             'noProductsFound' => $this->l('Keine Produkte gefunden.'),
             'selectedCount' => $this->l('Ausgewählt: %d Produkte'),
+            'previewRequired' => $this->l('Bitte wähle zuerst ein Produkt aus.'),
+            'previewLoading' => $this->l('Prompt wird geladen...'),
+            'previewError' => $this->l('Der Prompt konnte nicht ermittelt werden.'),
+            'previewModel' => $this->l('Modell'),
+            'previewSystem' => $this->l('System-Prompt'),
+            'previewUser' => $this->l('User-Prompt'),
         );
 
         $categoryRows = Db::getInstance()->executeS(
@@ -225,15 +241,27 @@ class InternautenProductAi extends Module
         $html .= '</div>';
         $html .= '<p class="help-block">' . htmlspecialchars($this->l('Tipp: Mit Strg/Cmd oder Shift kannst du mehrere Produkte markieren.'), ENT_QUOTES, 'UTF-8') . '</p>';
         $html .= '</div>';
-        $html .= '<button type="button" id="internauten-ai-bulk-generate" class="btn btn-primary">' . htmlspecialchars($this->l('Beschreibungen für Auswahl generieren'), ENT_QUOTES, 'UTF-8') . '</button>';
+        $html .= '<button type="button" id="internauten-ai-bulk-generate" class="btn btn-primary" style="margin-right:8px;">' . htmlspecialchars($this->l('Beschreibungen für Auswahl generieren'), ENT_QUOTES, 'UTF-8') . '</button>';
+        $html .= '<button type="button" id="internauten-ai-bulk-preview-prompt" class="btn btn-default">' . htmlspecialchars($this->l('Prompt des ersten Produkts anzeigen'), ENT_QUOTES, 'UTF-8') . '</button>';
         $html .= '<p id="internauten-ai-bulk-selected-count" style="margin-top:10px; margin-bottom:0;"></p>';
         $html .= '<p id="internauten-ai-bulk-status" style="margin-top:10px;"></p>';
         $html .= '<ul id="internauten-ai-bulk-results" class="list-unstyled" style="margin-top:10px; max-height: 240px; overflow:auto;"></ul>';
         $html .= '</div>';
 
+        $html .= '<div id="internauten-ai-prompt-modal" style="display:none; position:fixed; inset:0; z-index:10000; background:rgba(0,0,0,0.5);">';
+        $html .= '<div style="background:#fff; max-width:900px; margin:40px auto; padding:20px; border-radius:4px; max-height:85vh; display:flex; flex-direction:column;">';
+        $html .= '<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">';
+        $html .= '<h3 id="internauten-ai-prompt-modal-title" style="margin:0;">' . htmlspecialchars($this->l('Generierter Prompt'), ENT_QUOTES, 'UTF-8') . '</h3>';
+        $html .= '<button type="button" id="internauten-ai-prompt-modal-close" class="btn btn-default btn-sm">' . htmlspecialchars($this->l('Schliessen'), ENT_QUOTES, 'UTF-8') . '</button>';
+        $html .= '</div>';
+        $html .= '<div id="internauten-ai-prompt-modal-body" style="overflow:auto; flex:1 1 auto;"></div>';
+        $html .= '</div>';
+        $html .= '</div>';
+
         $scriptConfig = array(
             'ajaxUrl' => $ajaxUrl,
             'searchAjaxUrl' => $searchAjaxUrl,
+            'previewAjaxUrl' => $previewAjaxUrl,
             'idLang' => $idLang,
             'texts' => $texts,
         );
@@ -246,6 +274,11 @@ class InternautenProductAi extends Module
             . 'var selectVisible=document.getElementById("internauten-ai-bulk-select-visible");'
             . 'var clearSelection=document.getElementById("internauten-ai-bulk-clear-selection");'
             . 'var button=document.getElementById("internauten-ai-bulk-generate");'
+            . 'var previewButton=document.getElementById("internauten-ai-bulk-preview-prompt");'
+            . 'var modal=document.getElementById("internauten-ai-prompt-modal");'
+            . 'var modalBody=document.getElementById("internauten-ai-prompt-modal-body");'
+            . 'var modalTitle=document.getElementById("internauten-ai-prompt-modal-title");'
+            . 'var modalClose=document.getElementById("internauten-ai-prompt-modal-close");'
             . 'var selectedCount=document.getElementById("internauten-ai-bulk-selected-count");'
             . 'var status=document.getElementById("internauten-ai-bulk-status");'
             . 'var results=document.getElementById("internauten-ai-bulk-results");'
@@ -314,6 +347,49 @@ class InternautenProductAi extends Module
                 . 'results.innerHTML="";'
                 . 'processQueue(selected);'
             . '});'
+            . 'function closeModal(){if(modal){modal.style.display="none";}}'
+            . 'function renderPromptSection(label,value){'
+                . 'var wrapper=document.createElement("div");'
+                . 'wrapper.style.marginBottom="14px";'
+                . 'var heading=document.createElement("strong");'
+                . 'heading.textContent=label;'
+                . 'var pre=document.createElement("pre");'
+                . 'pre.style.whiteSpace="pre-wrap";'
+                . 'pre.style.wordBreak="break-word";'
+                . 'pre.style.marginTop="6px";'
+                . 'pre.textContent=value||"";'
+                . 'wrapper.appendChild(heading);'
+                . 'wrapper.appendChild(pre);'
+                . 'return wrapper;'
+            . '}'
+            . 'if(previewButton&&modal&&modalBody){'
+                . 'if(modalClose){modalClose.addEventListener("click",closeModal);}'
+                . 'modal.addEventListener("click",function(event){if(event.target===modal){closeModal();}});'
+                . 'document.addEventListener("keydown",function(event){if(event.key==="Escape"){closeModal();}});'
+                . 'previewButton.addEventListener("click",function(){'
+                    . 'syncCurrentSelections();'
+                    . 'var selected=Object.keys(selectedIds);'
+                    . 'if(!selected.length){window.alert(cfg.texts.previewRequired);return;}'
+                    . 'previewButton.disabled=true;'
+                    . 'status.textContent=cfg.texts.previewLoading;'
+                    . 'var body=new URLSearchParams();'
+                    . 'body.append("id_lang",String(cfg.idLang));'
+                    . 'body.append("id_product",selected[0]);'
+                    . 'fetch(cfg.previewAjaxUrl,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded; charset=UTF-8","X-Requested-With":"XMLHttpRequest"},credentials:"same-origin",body:body.toString()})'
+                        . '.then(parseJsonResponse)'
+                        . '.then(function(data){'
+                            . 'status.textContent="";'
+                            . 'if(modalTitle){modalTitle.textContent="#"+data.id_product+" - "+(data.name||"");}'
+                            . 'modalBody.innerHTML="";'
+                            . 'modalBody.appendChild(renderPromptSection(cfg.texts.previewModel,data.model||""));'
+                            . 'modalBody.appendChild(renderPromptSection(cfg.texts.previewSystem,data.system_prompt||""));'
+                            . 'modalBody.appendChild(renderPromptSection(cfg.texts.previewUser,data.user_prompt||""));'
+                            . 'modal.style.display="block";'
+                        . '})'
+                        . '.catch(function(error){status.textContent=error.message||cfg.texts.previewError;})'
+                        . '.finally(function(){previewButton.disabled=false;});'
+                . '});'
+            . '}'
                     . 'updateSelectedCount();'
             . 'queueSearch();'
         . '})();</script>';
@@ -749,6 +825,27 @@ class InternautenProductAi extends Module
 
         // Unknown or unresolved placeholders are left empty on purpose.
         return preg_replace('/\{\{\s*[a-z0-9_]+\s*\}\}/i', '', $template);
+    }
+
+    public function buildPromptPreview($productName, array $placeholders = array())
+    {
+        $systemPrompt = trim((string) (Configuration::get(self::CONFIG_SYSTEM_PROMPT) ?: $this->getDefaultSystemPrompt()));
+        $promptTemplate = trim((string) (Configuration::get(self::CONFIG_PROMPT_TEMPLATE) ?: $this->getDefaultPromptTemplate()));
+
+        if ($systemPrompt === '') {
+            $systemPrompt = $this->getDefaultSystemPrompt();
+        }
+
+        if ($promptTemplate === '') {
+            $promptTemplate = $this->getDefaultPromptTemplate();
+        }
+
+        return array(
+            'model' => trim((string) (Configuration::get(self::CONFIG_MODEL) ?: 'gpt-4o-mini')),
+            'system_prompt' => $systemPrompt,
+            'user_prompt' => $this->applyPromptPlaceholders($promptTemplate, $productName, $placeholders),
+            'placeholders' => $placeholders,
+        );
     }
 
     public function generateProductDescription($productName, array $placeholders = array())

@@ -68,6 +68,11 @@ class AdminInternautenProductAiGenerateController extends ModuleAdminController
         $this->ajaxProcessSearchBulkProducts();
     }
 
+    public function displayAjaxPreviewPrompt()
+    {
+        $this->ajaxProcessPreviewPrompt();
+    }
+
     protected function resolveLangIdByIso($isoCode)
     {
         $row = Db::getInstance()->getRow(
@@ -230,6 +235,70 @@ class AdminInternautenProductAiGenerateController extends ModuleAdminController
                 'success' => false,
                 'id_product' => (int) $idProduct,
                 'name' => $productName,
+                'message' => $exception->getMessage(),
+            ), 400);
+        }
+    }
+
+    public function ajaxProcessPreviewPrompt()
+    {
+        set_error_handler(function ($severity, $message, $file, $line) {
+            if (!(error_reporting() & $severity)) {
+                return false;
+            }
+
+            throw new ErrorException($message, 0, $severity, $file, $line);
+        });
+
+        try {
+            if (!$this->module || !method_exists($this->module, 'buildPromptPreview')) {
+                throw new Exception($this->translate('Das Modul konnte nicht geladen werden.'));
+            }
+
+            $idProduct = (int) Tools::getValue('id_product');
+            if ($idProduct <= 0) {
+                throw new Exception($this->translate('Es wurde kein Produkt ausgewählt.'));
+            }
+
+            $idLang = (int) Tools::getValue('id_lang');
+            if ($idLang <= 0) {
+                $idLang = (int) $this->context->language->id;
+            }
+
+            $germanLangId = $this->resolveLangIdByIso('de');
+            $nameLangId = $germanLangId > 0 ? $germanLangId : $idLang;
+
+            $row = Db::getInstance()->getRow(
+                'SELECT `name`'
+                . ' FROM `' . _DB_PREFIX_ . 'product_lang`'
+                . ' WHERE `id_product` = ' . (int) $idProduct
+                . ' AND `id_lang` = ' . (int) $nameLangId
+                . ' ORDER BY `id_shop` ASC'
+            );
+
+            $productName = isset($row['name']) ? trim((string) $row['name']) : '';
+            if ($productName === '') {
+                throw new Exception($this->translate('Produkt nicht gefunden oder ohne Namen.'));
+            }
+
+            $placeholders = $this->module->getProductPromptPlaceholders($idProduct, $nameLangId);
+            $preview = $this->module->buildPromptPreview($productName, $placeholders);
+
+            restore_error_handler();
+
+            $this->jsonResponse(array_merge(
+                array(
+                    'success' => true,
+                    'id_product' => (int) $idProduct,
+                    'name' => $productName,
+                ),
+                $preview
+            ));
+        } catch (Throwable $exception) {
+            restore_error_handler();
+
+            $this->jsonResponse(array(
+                'success' => false,
                 'message' => $exception->getMessage(),
             ), 400);
         }
