@@ -1,10 +1,10 @@
-# Copilot Instructions for InternautenB2BOffer
+# Copilot Instructions for InternautenProductAI
 
 These instructions guide GitHub Copilot when working in this repository. They help keep changes consistent with our project standards, architecture, and delivery workflow.
 
 ## Project context
 
-- This is a PrestaShop module with the module folder `InternautenB2BOffer`.
+- This is a PrestaShop module with the module folder `InternautenProductAI`.
 - Target platforms:
   - PrestaShop >= 9.1.4
   - PHP >= 8.3.31
@@ -39,13 +39,14 @@ Example of a concise, meaningful PHP file header:
 
 ## PrestaShop module-specific guidance
 
-- Keep the structure of the `InternautenB2BOffer` module folder consistent.
+- Keep the structure of the `InternautenProductAI` module folder consistent.
 - Only change hook names, service IDs, configuration keys, and database structures when there is a clear migration strategy.
 - Be aware that the module is loaded locally into the PrestaShop environment from `WoWGetPrestaLocal`.
 - For validation against the PrestaShop core, the relevant PrestaShop PHP code is located relative to this repository under `../WoWGetPrestaLocal/html`.
 - If PrestaShop implementations are needed for analysis, comparison, or compatibility checks, this path should be treated as the primary reference.
 - Any user-facing text shown in the back office or on the front end must always go through the translation files instead of being hardcoded in PHP, templates or other source files.
-- Keep the translation files for `en`, `de`, `fr`, and `it` aligned whenever new strings or behavior are introduced.
+- Keep the locale files aligned whenever new strings or behavior are introduced. The supported languages for this module are: `de` = German (Switzerland), `en` = English, `fr` = French, and `it` = Italian.
+- Update all relevant translation files together so the same feature is available in each supported locale.
 - In the German translation file, use proper German umlauts such as `ä`, `ö`, `ü`, and `ß` instead of ASCII substitutes.
 
 ## Quality assurance
@@ -54,6 +55,7 @@ Example of a concise, meaningful PHP file header:
 - Keep the module version current whenever a user-visible change, fix, or feature addition is made.
 - If a change affects the module behavior, the version should be reviewed and incremented according to the project release convention (`vX.Y.Z`).
 - Treat version updates as part of the change when shipping a new feature, fix, or user-facing improvement.
+- New features should normally trigger a minor bump in the version, for example `2.6.0` -> `2.7.0` for a meaningful added capability such as AI-generated brand images.
 
 - When changing code, add the most suitable tests or update existing ones.
 - If no automated tests are available, document concrete manual test steps.

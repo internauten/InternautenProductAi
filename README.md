@@ -16,6 +16,7 @@ Dieses PrestaShop-Modul ergänzt im Produkt-Admin einen Button, mit dem anhand d
 - OpenAI API Key, Modell und Prompt im Modul konfigurierbar
 - Konfigurierbare Modellparameter wie Temperatur, Max Tokens, Top P, Reasoning Effort und zusätzliche JSON-Parameter
 - HTML-Ausgabe für die direkte Nutzung in PrestaShop
+- Brand-/Logobild-Generierung für Marken im Hersteller-Bereich mit OpenAI-Bildmodellen
 
 ## Installation
 
@@ -23,6 +24,15 @@ Dieses PrestaShop-Modul ergänzt im Produkt-Admin einen Button, mit dem anhand d
 2. Im PrestaShop-Backoffice das Modul installieren.
 3. Unter **Module > Internauten Product AI > Konfigurieren** den OpenAI API Key eintragen.
 4. Ein Produkt öffnen und den Button **Mit ChatGPT generieren** nutzen oder die Batch-Funktion in der Modul-Konfiguration verwenden.
+
+## Brand-/Logobild-Generierung
+
+Im Hersteller-/Brand-Bereich steht ein eigener Button für die KI-Bildgenerierung zur Verfügung.
+
+- Auswahl des Bildmodells und des Standardprompts im Modul
+- Generierung eines Markenlogos auf Basis des Marken-/Herstellernamens
+- Direkte Speicherung als Herstellerlogo im PrestaShop-Backoffice
+- Nutzung von OpenAI-Bildmodellen wie `gpt-image-1`
 
 ## Batch-Funktion
 
@@ -44,6 +54,15 @@ Hinweis: Die Batch-Verarbeitung arbeitet in der aktuell im Backoffice ausgewähl
 - Für neuere Modelle können zusätzliche Parameter im Modul konfiguriert werden, z. B. `max_completion_tokens` oder `reasoning.effort`.
 - Bestehender Beschreibungstext wird bei der Generierung ersetzt.
 - Der erste Absatz der generierten Beschreibung wird zusätzlich in die Kurzbeschreibung übernommen.
+
+## Lokalisierung
+
+Alle sichtbaren Texte im Modul werden über die Übersetzungsdateien gepflegt und parallel in den Sprachen `de`, `en`, `fr` und `it` aktualisiert:
+
+- `internautenproductai/translations/de.php`
+- `internautenproductai/translations/en.php`
+- `internautenproductai/translations/fr.php`
+- `internautenproductai/translations/it.php`
 
 ## Release Tagging
 

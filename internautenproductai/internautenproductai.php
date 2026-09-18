@@ -8,6 +8,10 @@ class InternautenProductAi extends Module
     const CONFIG_API_KEY = 'IPA_OPENAI_API_KEY';
     const CONFIG_MODEL = 'IPA_OPENAI_MODEL';
     const CONFIG_MODEL_LIST = 'IPA_OPENAI_MODEL_LIST';
+    const CONFIG_IMAGE_MODEL = 'IPA_OPENAI_IMAGE_MODEL';
+    const CONFIG_IMAGE_MODEL_LIST = 'IPA_OPENAI_IMAGE_MODEL_LIST';
+    const CONFIG_IMAGE_PROMPT = 'IPA_OPENAI_IMAGE_PROMPT';
+    const CONFIG_IMAGE_SIZE = 'IPA_OPENAI_IMAGE_SIZE';
     const CONFIG_TEMPERATURE = 'IPA_OPENAI_TEMPERATURE';
     const CONFIG_MAX_TOKENS = 'IPA_OPENAI_MAX_TOKENS';
     const CONFIG_TOP_P = 'IPA_OPENAI_TOP_P';
@@ -20,7 +24,7 @@ class InternautenProductAi extends Module
     {
         $this->name = 'internautenproductai';
         $this->tab = 'administration';
-        $this->version = '2.6.0';
+        $this->version = '2.7.0';
         $this->author = 'die.internauten.ch GmbH';
         $this->need_instance = 0;
         $this->bootstrap = true;
@@ -42,6 +46,10 @@ class InternautenProductAi extends Module
             && $this->registerHook('displayBackOfficeHeader')
             && Configuration::updateValue(self::CONFIG_MODEL, 'gpt-4o-mini')
             && Configuration::updateValue(self::CONFIG_MODEL_LIST, '')
+            && Configuration::updateValue(self::CONFIG_IMAGE_MODEL, 'gpt-image-1')
+            && Configuration::updateValue(self::CONFIG_IMAGE_MODEL_LIST, '')
+            && Configuration::updateValue(self::CONFIG_IMAGE_PROMPT, $this->getDefaultBrandPrompt())
+            && Configuration::updateValue(self::CONFIG_IMAGE_SIZE, '1024x1024')
             && Configuration::updateValue(self::CONFIG_TEMPERATURE, '0.7')
             && Configuration::updateValue(self::CONFIG_MAX_TOKENS, '')
             && Configuration::updateValue(self::CONFIG_TOP_P, '')
@@ -56,6 +64,10 @@ class InternautenProductAi extends Module
         return Configuration::deleteByName(self::CONFIG_API_KEY)
             && Configuration::deleteByName(self::CONFIG_MODEL)
             && Configuration::deleteByName(self::CONFIG_MODEL_LIST)
+            && Configuration::deleteByName(self::CONFIG_IMAGE_MODEL)
+            && Configuration::deleteByName(self::CONFIG_IMAGE_MODEL_LIST)
+            && Configuration::deleteByName(self::CONFIG_IMAGE_PROMPT)
+            && Configuration::deleteByName(self::CONFIG_IMAGE_SIZE)
             && Configuration::deleteByName(self::CONFIG_TEMPERATURE)
             && Configuration::deleteByName(self::CONFIG_MAX_TOKENS)
             && Configuration::deleteByName(self::CONFIG_TOP_P)
@@ -105,6 +117,9 @@ class InternautenProductAi extends Module
         if (Tools::isSubmit('submitInternautenProductAi')) {
             $apiKey = trim((string) Tools::getValue(self::CONFIG_API_KEY));
             $model = trim((string) Tools::getValue(self::CONFIG_MODEL));
+            $imageModel = trim((string) Tools::getValue(self::CONFIG_IMAGE_MODEL));
+            $imagePrompt = trim((string) Tools::getValue(self::CONFIG_IMAGE_PROMPT));
+            $imageSize = trim((string) Tools::getValue(self::CONFIG_IMAGE_SIZE));
             $temperature = trim((string) Tools::getValue(self::CONFIG_TEMPERATURE));
             $maxTokens = trim((string) Tools::getValue(self::CONFIG_MAX_TOKENS));
             $topP = trim((string) Tools::getValue(self::CONFIG_TOP_P));
@@ -115,6 +130,18 @@ class InternautenProductAi extends Module
 
             if ($model === '') {
                 $model = 'gpt-4o-mini';
+            }
+
+            if ($imageModel === '') {
+                $imageModel = $this->getDefaultImageModel();
+            }
+
+            if ($imagePrompt === '') {
+                $imagePrompt = $this->getDefaultBrandPrompt();
+            }
+
+            if ($imageSize === '') {
+                $imageSize = '1024x1024';
             }
 
             if ($temperature === '') {
@@ -135,6 +162,9 @@ class InternautenProductAi extends Module
                 Configuration::updateValue(self::CONFIG_API_KEY, $apiKey);
                 $this->refreshModelCache($apiKey);
                 Configuration::updateValue(self::CONFIG_MODEL, $model);
+                Configuration::updateValue(self::CONFIG_IMAGE_MODEL, $imageModel);
+                Configuration::updateValue(self::CONFIG_IMAGE_PROMPT, $imagePrompt);
+                Configuration::updateValue(self::CONFIG_IMAGE_SIZE, $imageSize);
                 Configuration::updateValue(self::CONFIG_TEMPERATURE, $temperature);
                 Configuration::updateValue(self::CONFIG_MAX_TOKENS, $maxTokens);
                 Configuration::updateValue(self::CONFIG_TOP_P, $topP);
@@ -418,6 +448,8 @@ class InternautenProductAi extends Module
         $helper->fields_value = array(
             self::CONFIG_API_KEY => Configuration::get(self::CONFIG_API_KEY),
             self::CONFIG_MODEL => Configuration::get(self::CONFIG_MODEL) ?: 'gpt-4o-mini',
+            self::CONFIG_IMAGE_MODEL => Configuration::get(self::CONFIG_IMAGE_MODEL) ?: $this->getDefaultImageModel(),
+            self::CONFIG_IMAGE_SIZE => Configuration::get(self::CONFIG_IMAGE_SIZE) ?: '1024x1024',
             self::CONFIG_TEMPERATURE => Configuration::get(self::CONFIG_TEMPERATURE) ?: '0.7',
             self::CONFIG_MAX_TOKENS => Configuration::get(self::CONFIG_MAX_TOKENS),
             self::CONFIG_TOP_P => Configuration::get(self::CONFIG_TOP_P),
@@ -425,6 +457,7 @@ class InternautenProductAi extends Module
             self::CONFIG_EXTRA_PARAMETERS => Configuration::get(self::CONFIG_EXTRA_PARAMETERS),
             self::CONFIG_SYSTEM_PROMPT => Configuration::get(self::CONFIG_SYSTEM_PROMPT) ?: $this->getDefaultSystemPrompt(),
             self::CONFIG_PROMPT_TEMPLATE => Configuration::get(self::CONFIG_PROMPT_TEMPLATE) ?: $this->getDefaultPromptTemplate(),
+            self::CONFIG_IMAGE_PROMPT => Configuration::get(self::CONFIG_IMAGE_PROMPT) ?: $this->getDefaultBrandPrompt(),
         );
 
         $modelField = array(
@@ -521,6 +554,34 @@ class InternautenProductAi extends Module
                         'autoload_rte' => false,
                         'desc' => $this->l('Platzhalter: {{product_name}}, {{category}} (Standardkategorie), {{brand}} (Destillerie), {{region}} (Region), {{age}} (Alter), {{abv}} (VOL %), {{volume}} (Inhalt), {{vintage}} (Jahrgang), {{bottler}} (Abfüller). Nicht vorhandene Werte bleiben leer.'),
                     ),
+                    array(
+                        'type' => 'select',
+                        'label' => $this->l('Bildmodell'),
+                        'name' => self::CONFIG_IMAGE_MODEL,
+                        'required' => true,
+                        'desc' => $this->l('Modell für Logo-/Brand-Bilder. Empfohlen: gpt-image-1.'),
+                        'options' => array(
+                            'query' => $this->getAvailableBrandImageModels(),
+                            'id' => 'id',
+                            'name' => 'name',
+                        ),
+                    ),
+                    array(
+                        'type' => 'text',
+                        'label' => $this->l('Bildgröße'),
+                        'name' => self::CONFIG_IMAGE_SIZE,
+                        'required' => false,
+                        'desc' => $this->l('Beispiel: 1024x1024, 1536x1024, 1024x1536.'),
+                    ),
+                    array(
+                        'type' => 'textarea',
+                        'label' => $this->l('Bild-Prompt'),
+                        'name' => self::CONFIG_IMAGE_PROMPT,
+                        'rows' => 6,
+                        'cols' => 80,
+                        'autoload_rte' => false,
+                        'desc' => $this->l('Prompt für das Bild, z. B. „Erzeuge ein hochwertiges modernes Markenlogo für {{brand_name}}...“. Platzhalter: {{brand_name}}.'),
+                    ),
                 ),
                 'submit' => array(
                     'title' => $this->l('Speichern'),
@@ -548,27 +609,71 @@ class InternautenProductAi extends Module
 
     public function hookDisplayBackOfficeHeader()
     {
-        if (Tools::getValue('controller') !== 'AdminProducts') {
+        $controllerName = '';
+        if (isset($this->context->controller) && isset($this->context->controller->controller_name)) {
+            $controllerName = (string) $this->context->controller->controller_name;
+        }
+        if ($controllerName === '') {
+            $controllerName = (string) Tools::getValue('controller');
+        }
+
+        if ($controllerName === 'AdminProducts') {
+            $ajaxUrl = $this->context->link->getAdminLink(
+                'AdminInternautenProductAiGenerate',
+                true,
+                array(),
+                array(
+                    'ajax' => 1,
+                    'action' => 'GenerateDescription',
+                )
+            );
+
+            $fallbackAjaxUrl = $this->context->link->getBaseLink()
+                . ltrim($this->_path, '/')
+                . 'ajax.php?action=GenerateDescription&token='
+                . self::getAjaxToken();
+
+            $jsPath = $this->_path . 'views/js/admin-product.js';
+            $jsFile = $this->local_path . 'views/js/admin-product.js';
+            if (is_file($jsFile)) {
+                $jsPath .= '?v=' . (int) filemtime($jsFile);
+            }
+
+            $this->context->controller->addJS($jsPath);
+
+            Media::addJsDef(array(
+                'internautenProductAi' => array(
+                    'ajaxUrl' => $ajaxUrl,
+                    'fallbackAjaxUrl' => $fallbackAjaxUrl,
+                    'buttonLabel' => $this->l('Mit ChatGPT generieren'),
+                    'loadingLabel' => $this->l('Beschreibung wird erstellt...'),
+                    'errorNoName' => $this->l('Bitte zuerst einen Artikelnamen eintragen.'),
+                    'genericError' => $this->l('Die Beschreibung konnte nicht generiert werden.'),
+                    'generationError' => $this->l('Fehler bei der Generierung.'),
+                    'invalidJsonError' => $this->l('Der Server hat keine gültige JSON-Antwort geliefert:'),
+                    'emptyResponseLabel' => $this->l('leere Antwort'),
+                ),
+            ));
+
             return;
         }
 
-        $ajaxUrl = $this->context->link->getAdminLink(
+        if ($controllerName !== 'AdminManufacturers') {
+            return;
+        }
+
+        $brandAjaxUrl = $this->context->link->getAdminLink(
             'AdminInternautenProductAiGenerate',
             true,
             array(),
             array(
                 'ajax' => 1,
-                'action' => 'GenerateDescription',
+                'action' => 'GenerateBrandImage',
             )
         );
 
-        $fallbackAjaxUrl = $this->context->link->getBaseLink()
-            . ltrim($this->_path, '/')
-            . 'ajax.php?action=GenerateDescription&token='
-            . self::getAjaxToken();
-
-        $jsPath = $this->_path . 'views/js/admin-product.js';
-        $jsFile = $this->local_path . 'views/js/admin-product.js';
+        $jsPath = $this->_path . 'views/js/admin-manufacturer.js';
+        $jsFile = $this->local_path . 'views/js/admin-manufacturer.js';
         if (is_file($jsFile)) {
             $jsPath .= '?v=' . (int) filemtime($jsFile);
         }
@@ -576,16 +681,12 @@ class InternautenProductAi extends Module
         $this->context->controller->addJS($jsPath);
 
         Media::addJsDef(array(
-            'internautenProductAi' => array(
-                'ajaxUrl' => $ajaxUrl,
-                'fallbackAjaxUrl' => $fallbackAjaxUrl,
-                'buttonLabel' => $this->l('Mit ChatGPT generieren'),
-                'loadingLabel' => $this->l('Beschreibung wird erstellt...'),
-                'errorNoName' => $this->l('Bitte zuerst einen Artikelnamen eintragen.'),
-                'genericError' => $this->l('Die Beschreibung konnte nicht generiert werden.'),
-                'generationError' => $this->l('Fehler bei der Generierung.'),
-                'invalidJsonError' => $this->l('Der Server hat keine gültige JSON-Antwort geliefert:'),
-                'emptyResponseLabel' => $this->l('leere Antwort'),
+            'internautenManufacturerAi' => array(
+                'ajaxUrl' => $brandAjaxUrl,
+                'buttonLabel' => $this->l('Brand-Bild mit OpenAI generieren'),
+                'loadingLabel' => $this->l('Bild wird generiert...'),
+                'genericError' => $this->l('Das Bild konnte nicht generiert werden.'),
+                'errorNoName' => $this->l('Bitte zuerst einen Markenname eintragen.'),
             ),
         ));
     }
@@ -1000,14 +1101,16 @@ class InternautenProductAi extends Module
 
     protected function refreshModelCache($apiKey)
     {
-        if (trim((string) $apiKey) === '') {
-            return array();
+        $result = array();
+        if (trim((string) $apiKey) !== '') {
+            $result['text'] = $this->fetchAvailableModels($apiKey);
+            Configuration::updateValue(self::CONFIG_MODEL_LIST, json_encode($result['text']));
         }
 
-        $models = $this->fetchAvailableModels($apiKey);
-        Configuration::updateValue(self::CONFIG_MODEL_LIST, json_encode($models));
+        $result['image'] = $this->getAvailableBrandImageModels();
+        Configuration::updateValue(self::CONFIG_IMAGE_MODEL_LIST, json_encode($result['image']));
 
-        return $models;
+        return $result;
     }
 
     protected function fetchAvailableModels($apiKey)
@@ -1171,6 +1274,142 @@ class InternautenProductAi extends Module
         }
 
         return $decoded;
+    }
+
+    public function getDefaultImageModel()
+    {
+        return 'gpt-image-1';
+    }
+
+    public function getDefaultBrandPrompt()
+    {
+        return 'Erzeuge ein hochwertiges modernes Markenlogo für {{brand_name}}. Das Design soll premium, klar, hochwertig und markenstark sein, mit einem zeitgemäßen visuellen Stil für eine Whisky- oder Premium-Spirituosenmarke. Vermeide Text auf dem Logo, fokussiere auf eine starke, elegante Symbolik oder klassische Markenidentität. Das Bild muss stark, sauber und ideal für einen Hersteller-Header geeignet sein.';
+    }
+
+    public function getAvailableBrandImageModels()
+    {
+        return array(
+            array('id' => 'gpt-image-1', 'name' => 'gpt-image-1'),
+            array('id' => 'dall-e-3', 'name' => 'dall-e-3'),
+            array('id' => 'dall-e-2', 'name' => 'dall-e-2'),
+        );
+    }
+
+    public function generateBrandImage($brandName, $idManufacturer = 0)
+    {
+        $brandName = trim((string) $brandName);
+        $idManufacturer = (int) $idManufacturer;
+
+        if ($brandName === '') {
+            throw new Exception($this->l('Es wurde kein Markenname übergeben.'));
+        }
+
+        $apiKey = trim((string) Configuration::get(self::CONFIG_API_KEY));
+        $model = trim((string) (Configuration::get(self::CONFIG_IMAGE_MODEL) ?: $this->getDefaultImageModel()));
+        $size = trim((string) (Configuration::get(self::CONFIG_IMAGE_SIZE) ?: '1024x1024'));
+        $promptTemplate = trim((string) (Configuration::get(self::CONFIG_IMAGE_PROMPT) ?: $this->getDefaultBrandPrompt()));
+
+        if ($apiKey === '') {
+            throw new Exception($this->l('Es ist kein OpenAI API Key hinterlegt.'));
+        }
+
+        if ($size === '') {
+            $size = '1024x1024';
+        }
+
+        $userPrompt = str_replace('{{brand_name}}', $brandName, $promptTemplate);
+        $payload = array(
+            'model' => $model,
+            'prompt' => $userPrompt,
+            'size' => $size,
+        );
+
+        if ($model === 'gpt-image-1') {
+            $payload['output_format'] = 'png';
+        } else {
+            $payload['response_format'] = 'b64_json';
+        }
+
+        if (!function_exists('curl_init')) {
+            throw new Exception($this->l('Die PHP-cURL-Erweiterung ist auf dem Server nicht aktiviert.'));
+        }
+
+        $curl = curl_init('https://api.openai.com/v1/images/generations');
+        curl_setopt_array($curl, array(
+            CURLOPT_POST => true,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 90,
+            CURLOPT_HTTPHEADER => array(
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $apiKey,
+            ),
+            CURLOPT_POSTFIELDS => json_encode($payload),
+        ));
+
+        $response = curl_exec($curl);
+        $statusCode = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($curl);
+        curl_close($curl);
+
+        if ($response === false || $curlError) {
+            throw new Exception($this->l('OpenAI konnte nicht erreicht werden: ') . $curlError);
+        }
+
+        $data = json_decode($response, true);
+        if ($statusCode >= 400) {
+            $message = isset($data['error']['message']) ? $data['error']['message'] : $this->l('Unbekannter Fehler bei der Bildgenerierung.');
+            throw new Exception($message);
+        }
+
+        $b64Image = '';
+        if (isset($data['data'][0]['b64_json'])) {
+            $b64Image = (string) $data['data'][0]['b64_json'];
+        } elseif (isset($data['data'][0]['base64'])) {
+            $b64Image = (string) $data['data'][0]['base64'];
+        } elseif (isset($data['data'][0]['url'])) {
+            $imageUrl = trim((string) $data['data'][0]['url']);
+            if ($imageUrl !== '') {
+                $imageData = @file_get_contents($imageUrl);
+                if ($imageData === false) {
+                    throw new Exception($this->l('Das generierte Bild konnte nicht heruntergeladen werden.'));
+                }
+                $b64Image = base64_encode($imageData);
+            }
+        }
+
+        if ($b64Image === '') {
+            throw new Exception($this->l('OpenAI hat kein Bild zurückgegeben.'));
+        }
+
+        if ($idManufacturer <= 0) {
+            return $b64Image;
+        }
+
+        $binary = base64_decode($b64Image, true);
+        if ($binary === false) {
+            throw new Exception($this->l('Das generierte Bild konnte nicht verarbeitet werden.'));
+        }
+
+        $temporaryPath = tempnam(_PS_TMP_IMG_DIR_, 'IMG_');
+        if ($temporaryPath === false) {
+            throw new Exception($this->l('Es konnte kein temporärer Speicher für das generierte Bild erstellt werden.'));
+        }
+
+        $writeResult = @file_put_contents($temporaryPath, $binary);
+        if ($writeResult === false) {
+            @unlink($temporaryPath);
+            throw new Exception($this->l('Das generierte Bild konnte nicht lokal gespeichert werden.'));
+        }
+
+        $imagePath = _PS_MANU_IMG_DIR_ . (int) $idManufacturer . '.jpg';
+        if (!ImageManager::resize($temporaryPath, $imagePath)) {
+            @unlink($temporaryPath);
+            throw new Exception($this->l('Das generierte Bild konnte nicht als Markenlogo gespeichert werden.'));
+        }
+
+        @unlink($temporaryPath);
+
+        return $imagePath;
     }
 
     protected function getDefaultSystemPrompt()

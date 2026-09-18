@@ -31,6 +31,16 @@ $_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Mit Ch
 $_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Beschreibung wird erstellt...')] = 'Beschreibung wird erstellt...';
 $_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Bitte zuerst einen Artikelnamen eintragen.')] = 'Bitte zuerst einen Artikelnamen eintragen.';
 $_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Die Beschreibung konnte nicht generiert werden.')] = 'Die Beschreibung konnte nicht generiert werden.';
+$_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Modell für Logo-/Brand-Bilder. Empfohlen: gpt-image-1.')] = 'Modell für Logo-/Brand-Bilder. Empfohlen: gpt-image-1.';
+$_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Bildgröße')] = 'Bildgröße';
+$_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Beispiel: 1024x1024, 1536x1024, 1024x1536.')] = 'Beispiel: 1024x1024, 1536x1024, 1024x1536.';
+$_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Bild-Prompt')] = 'Bild-Prompt';
+$_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Prompt für das Bild, z. B. „Erzeuge ein hochwertiges modernes Markenlogo für {{brand_name}}...“. Platzhalter: {{brand_name}}.')] = 'Prompt für das Bild, z. B. „Erzeuge ein hochwertiges modernes Markenlogo für {{brand_name}}...“. Platzhalter: {{brand_name}}.';
+$_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Bildmodell')] = 'Bildmodell';
+$_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Brand-Bild mit OpenAI generieren')] = 'Brand-Bild mit OpenAI generieren';
+$_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Bild wird generiert...')] = 'Bild wird generiert...';
+$_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Das Bild konnte nicht generiert werden.')] = 'Das Bild konnte nicht generiert werden.';
+$_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Bitte zuerst einen Markenname eintragen.')] = 'Bitte zuerst einen Markenname eintragen.';
 $_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Fehler bei der Generierung.')] = 'Fehler bei der Generierung.';
 $_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Der Server hat keine gültige JSON-Antwort geliefert:')] = 'Der Server hat keine gültige JSON-Antwort geliefert:';
 $_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('leere Antwort')] = 'leere Antwort';

@@ -31,6 +31,16 @@ $_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Mit Ch
 $_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Beschreibung wird erstellt...')] = 'Generazione della descrizione...';
 $_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Bitte zuerst einen Artikelnamen eintragen.')] = 'Inserisci prima il nome del prodotto.';
 $_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Die Beschreibung konnte nicht generiert werden.')] = 'Non è stato possibile generare la descrizione.';
+$_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Modell für Logo-/Brand-Bilder. Empfohlen: gpt-image-1.')] = 'Modello per immagini di logo/marchio. Consigliato: gpt-image-1.';
+$_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Bildgröße')] = 'Dimensione immagine';
+$_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Beispiel: 1024x1024, 1536x1024, 1024x1536.')] = 'Esempio: 1024x1024, 1536x1024, 1024x1536.';
+$_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Bild-Prompt')] = 'Prompt dell\'immagine';
+$_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Prompt für das Bild, z. B. „Erzeuge ein hochwertiges modernes Markenlogo für {{brand_name}}...“. Platzhalter: {{brand_name}}.')] = 'Prompt per l\'immagine, ad esempio « Crea un logo di marca moderno e premium per {{brand_name}}... ». Segnaposto: {{brand_name}}.';
+$_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Bildmodell')] = 'Modello immagine';
+$_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Brand-Bild mit OpenAI generieren')] = 'Genera immagine del marchio con OpenAI';
+$_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Bild wird generiert...')] = 'Generazione dell\'immagine...';
+$_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Das Bild konnte nicht generiert werden.')] = 'Non è stato possibile generare l\'immagine.';
+$_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Bitte zuerst einen Markenname eintragen.')] = 'Inserisci prima il nome del marchio.';
 $_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Fehler bei der Generierung.')] = 'Errore durante la generazione.';
 $_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('Der Server hat keine gültige JSON-Antwort geliefert:')] = 'Il server non ha restituito una risposta JSON valida:';
 $_MODULE['<{internautenproductai}prestashop>internautenproductai_' . md5('leere Antwort')] = 'risposta vuota';

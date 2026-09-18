@@ -73,6 +73,11 @@ class AdminInternautenProductAiGenerateController extends ModuleAdminController
         $this->ajaxProcessPreviewPrompt();
     }
 
+    public function displayAjaxGenerateBrandImage()
+    {
+        $this->ajaxProcessGenerateBrandImage();
+    }
+
     protected function resolveLangIdByIso($isoCode)
     {
         $row = Db::getInstance()->getRow(
@@ -299,6 +304,60 @@ class AdminInternautenProductAiGenerateController extends ModuleAdminController
 
             $this->jsonResponse(array(
                 'success' => false,
+                'message' => $exception->getMessage(),
+            ), 400);
+        }
+    }
+
+    public function ajaxProcessGenerateBrandImage()
+    {
+        set_error_handler(function ($severity, $message, $file, $line) {
+            if (!(error_reporting() & $severity)) {
+                return false;
+            }
+
+            throw new ErrorException($message, 0, $severity, $file, $line);
+        });
+
+        try {
+            if (!$this->module || !method_exists($this->module, 'generateBrandImage')) {
+                throw new Exception($this->translate('Das Modul konnte nicht geladen werden.'));
+            }
+
+            $idManufacturer = (int) Tools::getValue('id_manufacturer');
+            if ($idManufacturer <= 0) {
+                throw new Exception($this->translate('Es wurde keine Marke ausgewählt.'));
+            }
+
+            $brandName = trim((string) Tools::getValue('brand_name'));
+            if ($brandName === '') {
+                $row = Db::getInstance()->getRow(
+                    'SELECT `name` FROM `' . _DB_PREFIX_ . 'manufacturer` WHERE `id_manufacturer` = ' . (int) $idManufacturer
+                );
+                $brandName = isset($row['name']) ? trim((string) $row['name']) : '';
+            }
+
+            if ($brandName === '') {
+                throw new Exception($this->translate('Der Markenname fehlt.'));
+            }
+
+            $outputPath = $this->module->generateBrandImage($brandName, $idManufacturer);
+
+            restore_error_handler();
+
+            $this->jsonResponse(array(
+                'success' => true,
+                'id_manufacturer' => $idManufacturer,
+                'name' => $brandName,
+                'image_path' => $outputPath,
+                'message' => $this->translate('Markenbild wurde erstellt und gespeichert.'),
+            ));
+        } catch (Throwable $exception) {
+            restore_error_handler();
+
+            $this->jsonResponse(array(
+                'success' => false,
+                'id_manufacturer' => (int) Tools::getValue('id_manufacturer'),
                 'message' => $exception->getMessage(),
             ), 400);
         }
